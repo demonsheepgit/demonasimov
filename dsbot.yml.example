@@ -1,0 +1,33 @@
+# Fill in the values appropriately, and rename
+# this file to dsbot.yml
+---
+irc:
+  # best to do your testing a local IRC server
+  # to turn it on for real, set the server to
+  # c.ustream.tv
+  server: localhost
+  # For mps and sqs 3 is a reasonable default for ustream
+  # otherwise there is a chance ustream will kick
+  # your bot out
+  messages_per_second: 3
+  server_queue_size: 3
+  nick: <your bot's nick>
+  user: <your bot's username, usually same as the nick>
+  # your bot's ustream password
+  password: <password>
+  realname: "<your bot's real name>"
+  channels: ['#the-hugh-hewitt-show']
+
+twitter:
+  # Get these values from https://apps.twitter.com
+  consumer_key: <consumer_key>
+  consumer_secret: <consumer_secret>
+  access_token: <access_token>
+  access_token_secret: <access_token_secret>
+
+nowplaying:
+  # an mplayer binary is required, where it is?
+  mplayer: /usr/local/bin/mplayer
+  # the stream URL where the title can be obtained
+  url: http://3143.live.streamtheworld.com:80/HUGHIRAAC_SC
+
