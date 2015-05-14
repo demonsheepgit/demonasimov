@@ -33,9 +33,12 @@ class Cinch::NowPlaying
 
   match /start announcing/, :method => :start_announcements
   match /stop announcing/,  :method => :stop_announcements
+  match /be quiet/,         :method => :stop_announcements
   match /start tweeting/,   :method => :start_tweeting
   match /stop tweeting/,    :method => :stop_tweeting
   match /status/,           :method => :show_status
+  match /what's playing/,   :method => :whats_playing
+  match /bye/,              :method => :bye
   listen_to :connect,       :method => :on_connect
 
   # Do some setup work when we first connect
@@ -64,9 +67,14 @@ class Cinch::NowPlaying
 
   end
 
+  def whats_playing(msg)
+    stream_title = get_stream_title()
+    msg.reply "#{stream_title}"
+  end
+
   # Set the tweeting flag to true
   def start_tweeting(msg)
-    msg.reply "will tweet the set list to @demonasimov's timeline."
+    msg.reply "tweeting the set list to my timeline, http://twitter.com/demonasimov"
     @@tweet = true
   end
 
@@ -113,7 +121,6 @@ class Cinch::NowPlaying
       end
       sleep(LOOP_INTERVAL)
     end
-    msg.reply "okay, #{msg.user.nick}. 'now playing' announcements silenced."
   end
 
   # Silence all announcements
@@ -121,11 +128,17 @@ class Cinch::NowPlaying
   # the main loop
   def stop_announcements(msg)
     if @@loop_active
-      msg.reply "Give me a few seconds, #{msg.user.nick}"
+      msg.reply "#{msg.user.nick} announcements silenced"
       @@loop_active=false
     else
-      msg.reply "#{msg.user.nick}: nothing to stop"
+      msg.reply "#{msg.user.nick}, I wasn't making any announcements"
     end
+  end
+
+  def bye(msg)
+    msg.reply "bye!"
+    sleep 1
+    exit(0)
   end
 
   # Tweet out the title
@@ -133,11 +146,11 @@ class Cinch::NowPlaying
     unless @twitter_client.nil?
 
       # Make sure the title is short enough
-      if title.length > 90
-        title = title[0,90]
+      if title.length > 80
+        title = title[0,80]
       end
       if @@tweet
-        @twitter_client.update("Now playing on #DuaneFM: #{title} http://bit.ly/1ErYiZr")
+        @twitter_client.update("Now playing on #DuaneFM: #{title} http://bit.ly/1ErYiZr #hewitt")
       end
 
     end
@@ -155,5 +168,7 @@ class Cinch::NowPlaying
     end
     return stream_title
   end
+
+
 
 end
