@@ -23,23 +23,19 @@ class Cinch::NowPlaying
 
   set :required_options, [:mplayer, :url]
 
-  @@loop_active = false
-  @@tweet = true
-  
+  @dj_state = false
+  @dj_tweeting = false
+
   # How long to wait after noticing a change to announce it
   ANNOUNCE_DELAY = 8 # seconds
   # How often to check the stream for changes
   LOOP_INTERVAL = 5 # seconds
 
-  match /start announcing/, :method => :start_announcements
-  match /stop announcing/,  :method => :stop_announcements
-  match /be quiet/,         :method => :stop_announcements
-  match /start tweeting/,   :method => :start_tweeting
-  match /stop tweeting/,    :method => :stop_tweeting
-  match /status/,           :method => :show_status
-  match /what's playing/,   :method => :whats_playing
-  match /bye/,              :method => :bye
-  listen_to :connect,       :method => :on_connect
+  match /dj (on|off)\s*$/,          :method => :set_dj_state
+  match /dj twitter (on|off)\s*$/,  :method => :set_twitter_state
+  match /dj\s*$|dj status\s*$/,     :method => :show_status
+  match /what's playing/,           :method => :whats_playing
+  listen_to :connect,               :method => :on_connect
 
   # Do some setup work when we first connect
   def on_connect(*)
@@ -52,18 +48,37 @@ class Cinch::NowPlaying
     end
   end
 
+  def set_dj_state(msg, option)
+
+    if @dj_state == option
+      msg.reply "DJ announcements already #{@dj_state ? 'enabled' : 'disabled'}"
+      return
+    end
+
+    @dj_state = option == 'on'
+    msg.reply "DJ announcements are now #{@dj_state ? 'enabled' : 'disabled'}"
+    start_announcements(msg) if @dj_state
+  end
+
+  def set_djtwitter_state(msg, option)
+
+    unless @dj_state
+      msg.reply 'DJ announcements are disabled'
+    else
+      @dj_tweeting = option == 'on'
+      msg.reply "DJ tweets are now #{@dj_tweeting ? 'enabled' : 'disabled'}: https://twitter.com/demonasimov"
+    end
+  end
+
   # Responds with state information
   def show_status(msg)
-    if @@loop_active
-      msg.reply 'song announcements: yes'
-      if @@tweet
-        msg.reply ' - tweeting: yes'
-      else
-        msg.reply ' - tweeting: no'
-      end
-    else
-      msg.reply 'song announcements: no'
+    response = "DJ announcements: #{@dj_state ? 'enabled' : 'disabled'}"
+
+    if @dj_state
+      response << " DJ tweets: #{@dj_tweeting ? 'enabled' : 'disabled'}"
     end
+
+    msg.reply response
 
   end
 
@@ -72,40 +87,20 @@ class Cinch::NowPlaying
     msg.reply "#{stream_title}"
   end
 
-  # Set the tweeting flag to true
-  def start_tweeting(msg)
-    msg.reply "tweeting the set list to my timeline, http://twitter.com/demonasimov"
-    @@tweet = true
-  end
-
-  # Turn off the tweeting flag
-  def stop_tweeting(msg)
-    msg.reply "okay, no more tweeting."
-    @@tweet = false
-  end
-
   # The "main" loop runs in this function for as long as
-  # @@loop_active is true
+  # @dj_state is true
   def start_announcements(msg)
-
-    if @@loop_active == true
-      msg.reply "Already announcing the titles, #{msg.user.nick}. Pay attention."
-      return
-    else
-      @@loop_active=true
-    end
 
     # Need to get the current stream title as a baseline
     prev_stream_title = nil
     stream_title = get_stream_title()
 
-    msg.reply "#{msg.user.nick}, here's what's playing on DuaneFM: #{stream_title}"
-    msg.reply "I'll keep announcing what's playing until someone tells me to stop"
+    msg.reply "Here's what's playing on DuaneFM: #{stream_title}"
 
     prev_stream_title = stream_title
 
     # There's probably a better way than this goofy loop to do this
-    while @@loop_active
+    while @dj_state
       stream_title = get_stream_title()
       if stream_title != prev_stream_title
         # delay a little before making the announcement
@@ -123,24 +118,6 @@ class Cinch::NowPlaying
     end
   end
 
-  # Silence all announcements
-  # they'll actually stop on the next pass through
-  # the main loop
-  def stop_announcements(msg)
-    if @@loop_active
-      msg.reply "#{msg.user.nick} announcements silenced"
-      @@loop_active=false
-    else
-      msg.reply "#{msg.user.nick}, I wasn't making any announcements"
-    end
-  end
-
-  def bye(msg)
-    msg.reply "bye!"
-    sleep 1
-    exit(0)
-  end
-
   # Tweet out the title
   def tweet(title)
     unless @twitter_client.nil?
@@ -149,7 +126,7 @@ class Cinch::NowPlaying
       if title.length > 80
         title = title[0,80]
       end
-      if @@tweet
+      if @dj_tweeting
         @twitter_client.update("Now playing on #DuaneFM: #{title} http://bit.ly/1ErYiZr #hewitt")
       end
 
