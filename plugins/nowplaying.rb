@@ -21,6 +21,18 @@ require 'twitter'
 class Cinch::NowPlaying
   include Cinch::Plugin
 
+  set :help, <<-EOF
+#{bot.nick} dj (on|off)
+  Turn DJ announcing on or off
+#{bot.nick} dj twitter (on|off)
+  Turn DJ tweeting on or off (requires DJ announcing to be on)
+#{bot.nick} dj status
+  Report the current DJ state (on or off)
+#{bot.nick} what's playing?
+  Reply with the current song title/artist
+EOF
+
+
   set :required_options, [:mplayer, :url]
 
   @dj_state = false
@@ -32,7 +44,7 @@ class Cinch::NowPlaying
   LOOP_INTERVAL = 5 # seconds
 
   match /dj (on|off)\s*$/,          :method => :set_dj_state
-  match /dj twitter (on|off)\s*$/,  :method => :set_twitter_state
+  match /dj twitter (on|off)\s*$/,  :method => :set_djtwitter_state
   match /dj\s*$|dj status\s*$/,     :method => :show_status
   match /what's playing/,           :method => :whats_playing
   listen_to :connect,               :method => :on_connect
@@ -63,7 +75,7 @@ class Cinch::NowPlaying
   def set_djtwitter_state(msg, option)
 
     unless @dj_state
-      msg.reply 'DJ announcements are disabled'
+      msg.reply "Enable the DJ first with '#{bot.name} dj on'"
     else
       @dj_tweeting = option == 'on'
       msg.reply "DJ tweets are now #{@dj_tweeting ? 'enabled' : 'disabled'}: https://twitter.com/demonasimov"
