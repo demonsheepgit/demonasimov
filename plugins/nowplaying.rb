@@ -22,14 +22,10 @@ class Cinch::NowPlaying
   include Cinch::Plugin
 
   set :help, <<-EOF
-#{bot.nick} dj (on|off)
-  Turn DJ announcing on or off
-#{bot.nick} dj twitter (on|off)
-  Turn DJ tweeting on or off (requires DJ announcing to be on)
-#{bot.nick} dj status
-  Report the current DJ state (on or off)
-#{bot.nick} what's playing?
-  Reply with the current song title/artist
+dj (on|off) - Turn DJ announcing on or off
+dj twitter (on|off) - Turn DJ tweeting on or off (DJ announcing must be on)
+dj status - Report the current DJ state (on or off)
+what's playing? - Reply with the current song title/artist
 EOF
 
 
@@ -62,22 +58,29 @@ EOF
 
   def set_dj_state(msg, option)
 
+    option = option == 'on' ? true : false
+
+    puts @dj_state
+    puts option
+
     if @dj_state == option
       msg.reply "DJ announcements already #{@dj_state ? 'enabled' : 'disabled'}"
       return
     end
 
-    @dj_state = option == 'on'
+    @dj_state = option == true
     msg.reply "DJ announcements are now #{@dj_state ? 'enabled' : 'disabled'}"
     start_announcements(msg) if @dj_state
   end
 
   def set_djtwitter_state(msg, option)
 
+    option = option == 'on' ? true : false
+
     unless @dj_state
       msg.reply "Enable the DJ first with '#{bot.name} dj on'"
     else
-      @dj_tweeting = option == 'on'
+      @dj_tweeting = option == true
       msg.reply "DJ tweets are now #{@dj_tweeting ? 'enabled' : 'disabled'}: https://twitter.com/demonasimov"
     end
   end
@@ -97,6 +100,7 @@ EOF
   def whats_playing(msg)
     stream_title = get_stream_title()
     msg.reply "#{stream_title}"
+
   end
 
   # The "main" loop runs in this function for as long as
@@ -146,7 +150,7 @@ EOF
   end
 
   # Fetch the stream title
-  def get_stream_title()
+  def get_stream_title
     stream_title = nil
     Open3.popen3(@mplayer_cmd) do |stdin, stdout, stderr, wait_thr|
       while line = stdout.gets
