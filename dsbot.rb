@@ -7,6 +7,7 @@ require 'yaml'
 # Plugins
 require 'cinch/plugins/fortune'
 require_relative 'plugins/nowplaying'
+require_relative 'plugins/requests'
 
 Cinch::Plugins::Fortune.configure do |config|
   config.max_length=160
@@ -35,8 +36,16 @@ bot = Cinch::Bot.new do
         :twitter_access_token => config['twitter']['access_token'],
         :twitter_access_token_secret=> config['twitter']['access_token_secret']
     }
+    param.plugins.options[Cinch::Requests] = {
+        :aws_access_key_id  => config['amazon']['aws_access_key_id'],
+        :aws_secret_access_key  => config['amazon']['aws_secret_access_key']
+    }
 
-    param.plugins.plugins = [Cinch::NowPlaying, Cinch::Plugins::Fortune]
+    param.plugins.plugins = [
+        Cinch::NowPlaying,
+        Cinch::Plugins::Fortune,
+        Cinch::Requests
+    ]
   end
 
   on :channel, /bye$/ do |m|
@@ -46,7 +55,5 @@ bot = Cinch::Bot.new do
   end
 
 end
-
-
 
 bot.start
