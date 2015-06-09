@@ -27,12 +27,12 @@ dj add remarks <N> <remarks> - add/change remarks (year, etc) to request number 
   set :prefix, /^dj\s+/
 
   listen_to :connect,                               :method => :on_connect
-  match /request\s+(http.*)\s*$/,                   :method => :add_request_by_url
-  match /request\s+(title:.*)$/,                    :method => :add_request_by_name
+  match /request (http.*)\s*$/,                     :method => :add_request_by_url
+  match /request (title:.*)$/,                      :method => :add_request_by_name
   match /list requests\s*$/,                        :method => :list_requests
   match /drop request\s+(\d)\s*$/,                  :method => :drop_request
-  match /set\s+(title|artist|album)\s+(\d)\s+(.*)/, :method => :set_song_param
-  match /add remarks\s+(\d)\s+(.*)/,                :method => :set_remarks
+  match /set (title|artist|album)\s+(\d)\s+(.*)/,   :method => :set_song_param
+  match /set (remarks|url)\s+(\d)\s+(.*)/,          :method => :set_song_param
   match /email requests\s*$/,                       :method => :email_requests
   # match isn't functioning ... we need to match on 'help' and only 'help'
   # match /^dj\s+help\s*$/,         :method => :help, :prefix => nil
@@ -70,6 +70,11 @@ dj add remarks <N> <remarks> - add/change remarks (year, etc) to request number 
       # TODO support rhapsody
       # when /rhapsody.com$/
       #   song = process_rhapsody_url(url)
+      # TODO support youtube
+      # download the mp3 audio using youtube-dl
+      # this will also mean that we'll need the user to supply the
+      # song information, and we'll set the ID3 tags.
+      # when /youtube.com$/
       else
         # TODO support cloud storage
         # this one will be harder and will
@@ -113,11 +118,14 @@ dj add remarks <N> <remarks> - add/change remarks (year, etc) to request number 
     end
   end
 
-  def set_remarks(msg, id, remarks)
-    set_song_param(msg, id, 'remarks', remarks)
-  end
-
   def set_song_param(msg, key, id, val)
+
+    # TODO handle modifying the URL separately
+    # The URL should only be settable if it isn't
+    # already set -
+    # ie, we don't want the user to supply an amazon URL
+    # which we then use to populate the track information, only to
+    # have the URL changed on us.
 
     song = @requests.get(msg.user.nick, id)
 
@@ -128,6 +136,8 @@ dj add remarks <N> <remarks> - add/change remarks (year, etc) to request number 
     song[key.downcase.to_sym] = val.strip
 
     @requests.update(msg.user.nick,id,song)
+
+    msg.reply("Updated #{key} for request ##{id}")
   end
 
   # Allow a user to drop one of their requests
@@ -200,6 +210,8 @@ dj add remarks <N> <remarks> - add/change remarks (year, etc) to request number 
 
   end
 
+  # TODO move the special URL handlers to their own class
+  # TODO add some rescue handling to these remote calls
   # @param [String] url Amazon URL of the specific song
   #
   # @return [SongStruct] populated if request is valid
@@ -222,7 +234,7 @@ dj add remarks <N> <remarks> - add/change remarks (year, etc) to request number 
     item = resp_hash['ItemLookupResponse']['Items']['Item']
     song = SongStruct.new()
     song.title = item['ItemAttributes']['Title']
-    song.artist = item['ItemAttributes']['Manufacturer']
+    song.artist = item['ItemAttributes']['Creator']['__content__']
     song.url = item['DetailPageURL']
 
     return song
@@ -233,7 +245,6 @@ dj add remarks <N> <remarks> - add/change remarks (year, etc) to request number 
   #
   # @return [SongStruct] populated if request is valid
   #   nil otherwise
-  # TODO
   def process_spotify_url(url)
     # https://play.spotify.com/track/68y4C6DGkdX0C9DjRbKB2g
     itemid = URI(url).path.split('/')[2]
@@ -248,7 +259,7 @@ dj add remarks <N> <remarks> - add/change remarks (year, etc) to request number 
 
   end
 
-  # TODO
+  # TODO Handle Rhapsody URLs
   # @param [String] url Rhapsody URL of the specific song
   #
   # @return [SongStruct] populated if request is valid
