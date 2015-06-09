@@ -221,7 +221,11 @@ dj add remarks <N> <remarks> - add/change remarks (year, etc) to request number 
     itemid = URI(url).path.split('/')[2]
 
     response = @amazon.item_lookup(
-        query: { 'ItemId' => itemid }
+        query: {
+            'ItemId' => itemid,
+            'ResponseGroup' => %w(RelatedItems Small).join(','),
+            'RelationshipType' => 'Tracks'
+        }
     )
 
     resp_hash = response.to_h
@@ -235,6 +239,7 @@ dj add remarks <N> <remarks> - add/change remarks (year, etc) to request number 
     song = SongStruct.new()
     song.title = item['ItemAttributes']['Title']
     song.artist = item['ItemAttributes']['Creator']['__content__']
+    song.album = item['RelatedItems']['RelatedItem']['Item']['ItemAttributes']['Title']
     song.url = item['DetailPageURL']
 
     return song
