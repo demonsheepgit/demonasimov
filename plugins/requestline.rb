@@ -26,26 +26,23 @@ dj add remarks <N> <remarks> - add/change remarks (year, etc) to request number 
 
   set :prefix, /^dj\s+/
 
-  listen_to :connect,             :method => :on_connect
-  match /request (http.*)\s*$/,   :method => :add_request_byurl
-  match /request (title:.*)$/,    :method => :add_request_byname
-  match /list requests\s*$/,      :method => :list_requests
-  match /drop request (\d)\s*$/,  :method => :drop_request
-  match /set title (\d) (.*)/,    :method => :set_title
-  match /set artist (\d) (.*)/,   :method => :set_artist
-  match /set album (\d) (.*)/,    :method => :set_album
-  match /add remarks (\d) (.*)/,  :method => :set_remarks
-  match /email requests\s*$/,     :method => :email_requests
+  listen_to :connect,                               :method => :on_connect
+  match /request\s+(http.*)\s*$/,                   :method => :add_request_by_url
+  match /request\s+(title:.*)$/,                    :method => :add_request_by_name
+  match /list requests\s*$/,                        :method => :list_requests
+  match /drop request\s+(\d)\s*$/,                  :method => :drop_request
+  match /set\s+(title|artist|album)\s+(\d)\s+(.*)/, :method => :set_song_param
+  match /add remarks\s+(\d)\s+(.*)/,                :method => :set_remarks
+  match /email requests\s*$/,                       :method => :email_requests
   # match isn't functioning ... we need to match on 'help' and only 'help'
   # match /^dj\s+help\s*$/,         :method => :help, :prefix => nil
 
   def initialize(*args)
     super
-    @requests = {}
+    @requests = Requests.new
     @admins = ['demonsheep']
     @amazon = Vacuum.new
 
-    @reqs = Requests.new
   end
 
   def on_connect(*)
@@ -62,8 +59,7 @@ dj add remarks <N> <remarks> - add/change remarks (year, etc) to request number 
   end
 
   # Allow a user to create a new request by giving a url
-  def add_request_byurl(msg, url)
-    init_requests(msg.user)
+  def add_request_by_url(msg, url)
 
     # attempt to resolve the url to a product
     case URI(url).host
@@ -83,8 +79,7 @@ dj add remarks <N> <remarks> - add/change remarks (year, etc) to request number 
     end
 
     unless song.nil?
-      @reqs.add(msg.user.nick, song)
-      @requests[msg.user.nick] << song
+      @requests.add(msg.user.nick, song)
       msg.reply('Added request: ' + song.to_s)
     else
       msg.reply("Couldn't process your request.")
@@ -92,96 +87,88 @@ dj add remarks <N> <remarks> - add/change remarks (year, etc) to request number 
 
   end
 
-  def add_request_byname(msg,subject)
-    init_requests(msg.user)
+  def add_request_by_name(msg,subject)
 
     song = SongStruct.new()
     tokens = subject.split(/(title|album|artist):\s*/)
 
+    valid_tokens = %w(title artist album)
+
     tokens.each_with_index do |token, index|
+
       if (index + 1) == tokens.size
-        break
+        break # past the end
       end
 
-      case token
-        when 'title'
-          song[:title] = tokens[index+1].strip
-        when 'artist'
-          song[:artist] = tokens[index+1].strip
-        when 'album'
-          song[:album] = tokens[index+1].strip
+      if valid_tokens.include? token
+        song[token.to_sym] = tokens[index+1].strip
       end
     end
 
     if song[:title] == nil || song[:artist] == nil
       msg.reply('You must supply at least title and artist')
     else
-      @reqs.add(msg.user.nick, song)
-      @requests[msg.user.nick] << song
-      msg.reply("Added request #{@requests[msg.user.nick].count}: #{song.to_s}")
+      @requests.add(msg.user.nick, song)
+      msg.reply("Added request #{@requests.count}: #{song.to_s}")
     end
-
-  end
-
-  def set_title(msg, id, title)
-    set_song_param(msg, id, :title, title)
-  end
-
-  def set_artist(msg, id, artist)
-    set_song_param(msg, id, :artist, artist)
-  end
-
-  def set_album(msg, id, album)
-    set_song_param(msg, id, :album, album)
   end
 
   def set_remarks(msg, id, remarks)
-    set_song_param(msg, id, :remarks, remarks)
+    set_song_param(msg, id, 'remarks', remarks)
   end
 
-  def set_song_param(msg, id, key, val)
-    init_requests(msg.user)
-    if @requests[msg.user.nick][id.to_i].nil?
-      msg.reply("Can't find song ##{id}")
+  def set_song_param(msg, key, id, val)
+
+    song = @requests.get(msg.user.nick, id)
+
+    if song.nil?
+      msg.reply("Can't find song ##{id} for #{msg.user.nick}")
       return
     end
-    @requests[msg.user.nick][id.to_i][key] = val.strip
+    song[key.downcase.to_sym] = val.strip
+
+    @requests.update(msg.user.nick,id,song)
   end
 
   # Allow a user to drop one of their requests
   # They must specify the sequence id #
   def drop_request(msg, id)
-    init_requests(msg.user)
 
-    if @requests[msg.user.nick][id.to_i].nil?
-      msg.reply "Can't find song ##{id}"
+    song = @requests.get(msg.user.nick, id)
+
+    if song.nil?
+      msg.reply "Can't find song ##{id} for #{msg.user.nick}"
       return
     end
 
-    song = @requests[msg.user.nick][id.to_i]
-    @requests[msg.user.nick].delete_at(id.to_i)
-    @reqs.remove(msg.user.nick, id)
-    msg.reply("Dropped ##{id}, #{song[:title]} by #{song[:artist]}")
+    # save the title and artist for our reply message
+    # before calling for the request to be deleted
+    deleted_title = song[:title]
+    deleted_artist = song[:artist]
+
+    @requests.remove(msg.user.nick, id)
+    msg.reply("Dropped request ##{id}, #{deleted_title} by #{deleted_artist}")
   end
 
   # Tell the user what songs they've requested for this week
   # Each request should have a prefix sequence id # to allow
   # them to drop a request from the list
   def list_requests(msg)
-    init_requests(msg.user)
+    request_list = @requests.list(msg.user.nick)
 
-    count_requests(msg)
-    @requests[msg.user.nick].each_with_index do |song, index|
-      msg.reply("##{index}) #{song.to_s}")
+    if request_list.count == 0
+      msg.reply('You have no requests.')
+      return
     end
 
-    puts @reqs.list(msg.user.nick)
-
+    request_list.each_with_index do |song, index|
+      msg.reply("##{index}) #{song.to_s}")
+    end
   end
 
   # Tell the user how many requests they have
   def count_requests(msg)
-    init_requests(msg.user)
+
     count = @requests[msg.user.nick].count
     case count
       when 0
@@ -191,8 +178,6 @@ dj add remarks <N> <remarks> - add/change remarks (year, etc) to request number 
       else
         msg.reply("You have #{count} requests.")
     end
-
-    puts "#{msg.user.nick} count #{@reqs.count(msg.user.nick)}"
 
   end
 
@@ -270,14 +255,6 @@ dj add remarks <N> <remarks> - add/change remarks (year, etc) to request number 
   #   nil otherwise
   def process_rhapsody_url(url)
 
-  end
-
-  # init the @requests hash for a user
-  # @return [void]
-  # TODO - make this happen for each user on_connect
-  # TODO - watch the join to make this happen for each new user
-  def init_requests(user)
-    @requests[user.nick] = [] if @requests[user.nick].nil?
   end
 
   # @param [User] user The user to check for admin status

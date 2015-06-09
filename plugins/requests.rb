@@ -59,6 +59,18 @@ class Requests
 
   end
 
+  # Fetch the requested song
+  # @param nick [String] user nick
+  # @param id [int] the request to be modified
+  #
+  # @return [SongStruct]
+  def get(nick, id)
+    return nil if @requests[nick].nil?
+    return nil if @requests[nick][id.to_i].nil?
+
+    return @requests[nick][id.to_i]
+  end
+
   # Replace/update the song identified by id
   # @param nick [String] user nick
   # @param id [int] the request to be modified
@@ -69,7 +81,7 @@ class Requests
     return if @requests[nick].nil?
     return if @requests[nick][id.to_i].nil?
 
-    @requests[nick][id] = song
+    @requests[nick][id.to_i] = song
   end
 
   # @param nick [String] user's nick or nil for all users
