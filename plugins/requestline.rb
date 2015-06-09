@@ -255,9 +255,13 @@ dj add remarks <N> <remarks> - add/change remarks (year, etc) to request number 
     itemid = URI(url).path.split('/')[2]
 
     track = RSpotify::Track.find(itemid)
+
+    pp track
+
     song = SongStruct.new()
     song.artist = track.artists[0].name
     song.title = track.name
+    song.album = track.album.name
     song.url = url
 
     return song
