@@ -1,26 +1,7 @@
 require 'date'
 require 'open-uri'
 require 'pp'
-
-class SongStruct < Struct.new(:title, :artist, :album, :remarks, :url)
-
-  def to_s
-    s = "#{title} by #{artist}"
-    s << " on #{album}" if album
-    s << " (Remarks: #{remarks})" if remarks
-    s << " #{shorten(url)}" if url
-    s
-  end
-
-
-  def shorten(url)
-    url = open("http://tinyurl.com/api-create.php?url=#{URI.escape(url)}").read
-    url == 'Error' ? nil : url
-  rescue OpenURI::HTTPError
-    nil
-  end
-
-end
+require_relative 'song'
 
 class Requests
 
@@ -44,7 +25,7 @@ class Requests
 
     puts "Added request #{nick}|#{@requests[nick].count}|#{song}"
 
-    return @requests[nick].count
+    return @requests[nick].count - 1
   end
 
   # @param nick [String] user nick
@@ -90,10 +71,10 @@ class Requests
   #    or the total request count if nil
   #   nil otherwise
   def count(nick=nil)
+
     return 0 if @requests[nick].nil?
 
     count_request = 0
-
     if (nick.nil?)
       @requests.each do |nick|
         count_request += @requests[nick].count
