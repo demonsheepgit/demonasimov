@@ -19,13 +19,13 @@ class Requests
   # @return [int] the int id of the song added
   #   nil otherwise
   def add(nick, song)
-    @requests[nick] = [] unless @requests.key?(nick)
+    @requests[nick] = {} unless @requests.key?(nick)
+    song_id = @requests[nick].length + 1
+    @requests[nick][song_id] = song
 
-    @requests[nick] << song
+    puts "Added request #{nick}|#{song_id}|#{song}"
 
-    puts "Added request #{nick}|#{@requests[nick].count}|#{song}"
-
-    return @requests[nick].count - 1
+    return song_id
   end
 
   # @param nick [String] user nick
@@ -36,7 +36,14 @@ class Requests
     return if @requests[nick].nil?
     return if @requests[nick][id.to_i].nil?
 
-    @requests[nick].delete_at(id.to_i)
+    @requests[nick].delete(id.to_i)
+
+    # reset the keys
+    idx = 1
+    @requests[nick].keys.each do |id|
+      @requests[nick][idx] = @requests[nick].delete(id)
+      idx += 1
+    end
 
   end
 
@@ -77,10 +84,10 @@ class Requests
     count_request = 0
     if (nick.nil?)
       @requests.each do |nick|
-        count_request += @requests[nick].count
+        count_request += @requests[nick].length
       end
     else
-      count_request = @requests[nick].count
+      count_request = @requests[nick].length
     end
 
     return count_request
@@ -91,7 +98,7 @@ class Requests
   #
   # @return [Array] of the user's requests
   def list(nick)
-    return [] if @requests[nick].nil?
+    return {} if @requests[nick].nil?
     return @requests[nick]
   end
 

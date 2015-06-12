@@ -92,7 +92,7 @@ dj help url - Show the URL types I can process into songs
         # TODO support cloud storage
         # this one will be harder and will
         # require us to download the mp3 file
-        error("Unable to process URL for #{URI(url).host}")
+        error("Don't know how to process URLs for #{URI(url).host}")
         return
     end
 
@@ -184,8 +184,8 @@ dj help url - Show the URL types I can process into songs
 
     return if request_list.count == 0
 
-    request_list.each_with_index do |song, index|
-      msg.reply("##{index}) #{song.to_s}")
+    request_list.each do |id, song|
+      msg.reply("##{id}) #{song.to_s}")
     end
   end
 
