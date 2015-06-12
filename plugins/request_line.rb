@@ -19,6 +19,7 @@ dj set title <N> <title> - change the title of request <N>
 dj set artist <N> <artist> - change the artist of request <N>
 dj set album <N> <album> - add/change the album of request <N>
 dj add remarks <N> <remarks> - add/change remarks (year, etc) to request number <N>
+dj help url - Show the URL types I can process into songs
   EOF
 
   set :prefix, /^dj\s+/
@@ -32,6 +33,7 @@ dj add remarks <N> <remarks> - add/change remarks (year, etc) to request number 
   match /set (title|artist|album)\s+(\d)\s+(.*)/,   :method => :set_song_param
   match /set (remarks|url)\s+(\d)\s+(.*)/,          :method => :set_song_param
   match /email requests\s*$/,                       :method => :email_requests
+  match /help url\s*/,                              :method => :help_url
   # match isn't functioning ... we need to match on 'help' and only 'help'
   # match /^dj\s+help\s*$/,         :method => :help, :prefix => nil
 
@@ -55,6 +57,11 @@ dj add remarks <N> <remarks> - add/change remarks (year, etc) to request number 
   def help(msg)
     msg.reply 'Help:'
     msg.reply(:help)
+  end
+
+  def help_url(msg)
+    msg.reply('The following URLs/sites are supported:')
+    msg.reply('Amazon, Spotify')
   end
 
   # Allow a user to create a new request by giving a url
@@ -89,11 +96,11 @@ dj add remarks <N> <remarks> - add/change remarks (year, etc) to request number 
         return
     end
 
-    unless song.nil?
+    unless song.error.is_a?(Exception)
       id = @requests.add(msg.user.nick, song)
       msg.reply("Added request: ##{id}: #{song.to_s}")
     else
-      msg.reply("Couldn't process your request.")
+      msg.reply("Uh oh, something went wrong: #{song.error.message}")
     end
 
   end
@@ -217,32 +224,38 @@ dj add remarks <N> <remarks> - add/change remarks (year, etc) to request number 
   end
 
   # TODO move the special URL handlers to their own class
-  # TODO add some rescue handling to these remote calls
   # @param [String] url Amazon URL of the specific song
   #
   # @return [Song] populated if request is valid
   #   nil otherwise
   def process_amazon_url(url)
 
+    song = Song.new()
+
     itemid = URI(url).path.split('/')[2]
+    resp_hash = Hash.new
 
-    response = @amazon.item_lookup(
-        query: {
-            'ItemId'           => itemid,
-            'ResponseGroup'    => %w(RelatedItems Small).join(','),
-            'RelationshipType' => 'Tracks'
-        }
-    )
+    begin
+      response = @amazon.item_lookup(
+          query: {
+              'ItemId'           => itemid,
+              'ResponseGroup'    => %w(RelatedItems Small).join(','),
+              'RelationshipType' => 'Tracks'
+          }
+      )
 
-    resp_hash = response.to_h
-
-    if resp_hash['ItemLookupResponse']['Items']['Request']['Errors']
-      error(resp_hash['ItemLookupResponse']['Items']['Request']['Errors']['Error']['Message'])
-      return nil
+      resp_hash = response.to_h
+      if resp_hash['ItemLookupResponse']['Items']['Request']['Errors']
+        raise resp_hash['ItemLookupResponse']['Items']['Request']['Errors']['Error']['Message']
+      end
+    rescue Exception => e
+      error("Amazon request failed: #{e.message}")
+      song.error = e
+      return song
     end
 
     item = resp_hash['ItemLookupResponse']['Items']['Item']
-    song = Song.new()
+
     song.title  = item['ItemAttributes']['Title']
     song.artist = item['ItemAttributes']['Creator']['__content__']
     song.album  = item['RelatedItems']['RelatedItem']['Item']['ItemAttributes']['Title']
@@ -258,12 +271,20 @@ dj add remarks <N> <remarks> - add/change remarks (year, etc) to request number 
   # @return [Song] populated if request is valid
   #   nil otherwise
   def process_spotify_url(url)
+
+    song = Song.new
+
     # https://play.spotify.com/track/68y4C6DGkdX0C9DjRbKB2g
     itemid = URI(url).path.split('/')[2]
 
-    track = RSpotify::Track.find(itemid)
+    begin
+      track = RSpotify::Track.find(itemid)
+    rescue Exception => e
+      error("Spotify request failed: #{e.message}")
+      song.error = e
+      return song
+    end
 
-    song = Song.new
     song.artist = track.artists[0].name
     song.title = track.name
     song.album = track.album.name

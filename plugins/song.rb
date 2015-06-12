@@ -5,6 +5,7 @@ class Song
   attr_accessor :album
   attr_accessor :remarks
   attr_accessor :url
+  attr_accessor :error
 
   def to_s
     s = "#{title} by #{artist}"
@@ -30,10 +31,10 @@ class Song
   end
 
   def shorten(url)
-    url = open("http://tinyurl.com/api-create.php?url=#{URI.escape(url)}").read
-    url == 'Error' ? nil : url
+    short_url = open("http://tinyurl.com/api-create.php?url=#{URI.escape(url)}").read
+    short_url == 'Error' ? nil : url
   rescue OpenURI::HTTPError
-    nil
+    url
   end
 
 end
