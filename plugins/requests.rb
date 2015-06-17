@@ -43,8 +43,9 @@ class Requests
 
     @requests[nick].delete(id.to_i)
 
-    # reset the keys
+    # re-sequence the request_id keys
     idx = 1
+
     @requests[nick].keys.each do |id|
       @requests[nick][idx] = @requests[nick].delete(id)
       idx += 1

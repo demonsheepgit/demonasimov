@@ -67,8 +67,6 @@ dj help url - Show the URL types I can process into songs
   # Allow a user to create a new request by giving a url
   def add_request_by_url(msg, url)
 
-    puts 'count:' + @requests.count(msg.user.nick).to_s
-
     if @requests.count(msg.user.nick) >= @max_requests
       msg.reply('You already have the maximum number of requests.')
       return
@@ -96,15 +94,15 @@ dj help url - Show the URL types I can process into songs
         return
     end
 
-    unless song.error.is_a?(Exception)
+    if song.error.is_a?(Exception)
+      msg.reply("Uh oh, something went wrong: #{song.error.message}")
+    else
       song_id = nil
       synchronize(:request_sync) do
         song_id = @requests.add(msg.user.nick, song)
       end
 
       msg.reply("Added request: ##{song_id}: #{song.to_s}")
-    else
-      msg.reply("Uh oh, something went wrong: #{song.error.message}")
     end
 
   end
@@ -117,9 +115,9 @@ dj help url - Show the URL types I can process into songs
     end
 
     song = Song.new()
-    tokens = subject.split(/(title|album|artist):\s*/)
+    tokens = subject.split(/(title|album|artist|remarks):\s*/)
 
-    valid_tokens = %w(title artist album)
+    valid_tokens = %w(title artist album remarks)
 
     tokens.each_with_index do |token, index|
       break if (index + 1) == tokens.size
@@ -170,9 +168,6 @@ dj help url - Show the URL types I can process into songs
   def drop_request(msg, id)
 
     song = @requests.get(msg.user.nick, id)
-
-    puts "got song:"
-    puts song
 
     if song.nil?
       msg.reply "Can't find request ##{id}"

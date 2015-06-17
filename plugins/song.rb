@@ -29,6 +29,8 @@ class Song
       remarks = nil,
       url     = nil
   )
+
+    super
     @title   = title
     @artist  = artist
     @album   = album
