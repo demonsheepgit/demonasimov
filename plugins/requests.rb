@@ -22,7 +22,6 @@ class Requests
   #
   # @return [int] the int id of the song added
   #   nil otherwise
-  # TODO make thread safe
   def add(nick, song)
 
     @requests[nick] = {} unless @requests.key?(nick)
@@ -31,7 +30,6 @@ class Requests
 
     save_requests
 
-    puts "Added request #{nick}|#{song_id}|#{song}"
     return song_id
   end
 
@@ -39,7 +37,6 @@ class Requests
   # @param id [int] the song to be removed
   #
   # @return void
-  # TODO make thread safe
   def remove(nick, id)
     return if @requests[nick].nil?
     return if @requests[nick][id.to_i].nil?
@@ -78,7 +75,6 @@ class Requests
   # @param song [SongStruct] the updated song
   #
   # @return void
-  # TODO make thread safe
   def update(nick, id, song)
     return if @requests[nick].nil?
     return if @requests[nick][id.to_i].nil?
@@ -119,11 +115,9 @@ class Requests
 
   # Write the data out to the persistence layer (ie redis)
   # @return void
-  # TODO Handle thread sync
   # TODO set up a periodic save
   # TODO request a save on exit
   def save_requests
-    #  puts @requests.to_json
     @redis.set("requests-#{@next_show_date}", @requests.to_json)
   end
 
@@ -136,10 +130,17 @@ class Requests
     if request_data.nil?
       return {}
     else
-      # convert the string representations of the id to an integer
-      json_data = JSON.parse(request_data, :create_additions => true)
 
-      return json_data
+      request_data = JSON.parse(request_data, :create_additions => true)
+
+      # convert the string representations of the request sequence id to an integer
+      request_data.keys.each do |nick|
+        request_data[nick].keys.each do |id_string|
+          request_data[nick][id_string.to_i] = request_data[nick].delete(id_string)
+        end
+      end
+
+      return request_data
     end
 
   end
