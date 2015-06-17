@@ -2,12 +2,14 @@ require 'open-uri'
 
 class Song
 
-  # TODO: enforce limits on the input
-  attr_accessor :title
-  attr_accessor :artist
-  attr_accessor :album
-  attr_accessor :remarks
-  attr_accessor :url
+  MAX_STR_LENGTH = 96
+  MAX_URL_LENGTH = 256
+  MAX_REMARKS_LENGTH = 256
+  attr_reader :title
+  attr_reader :artist
+  attr_reader :album
+  attr_reader :remarks
+  attr_reader :url
   attr_accessor :error
 
   @short_url
@@ -32,6 +34,26 @@ class Song
     @album   = album
     @remarks = remarks
     @url     = url
+  end
+
+  def title=(value)
+    @title = value.slice(0..MAX_STR_LENGTH)
+  end
+
+  def artist=(value)
+    @artist = value.slice(0..MAX_STR_LENGTH)
+  end
+
+  def album=(value)
+    @album = value.slice(0..MAX_STR_LENGTH)
+  end
+
+  def url=(value)
+    @url = value.slice(0..MAX_URL_LENGTH)
+  end
+
+  def remarks=(value)
+    @remarks = value.slice(0..MAX_REMARKS_LENGTH)
   end
 
   def to_json(*a)
