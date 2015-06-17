@@ -1,5 +1,4 @@
-require 'vacuum' # amazon
-require 'rspotify' #spotify
+
 require 'uri'
 require 'open-uri'
 require 'pp'
@@ -67,17 +66,22 @@ dj help url - Show the URL types I can process into songs
   # Allow a user to create a new request by giving a url
   def add_request_by_url(msg, url)
 
-    if @requests.count(msg.user.nick) >= @max_requests
+    unless @requests.count(msg.user.nick) < @max_requests
       msg.reply('You already have the maximum number of requests.')
+      return
+    end
+
+    unless url =~ URI::regexp
+      msg.reply('Invalid URL')
       return
     end
 
     # attempt to resolve the url to a product
     case URI(url).host
       when /amazon.com$/
-        song = process_amazon_url(url)
+        song = Song.process_amazon_url(url)
       when /spotify.com$/
-        song = process_spotify_url(url)
+        song = Song.process_spotify_url(url)
       # TODO support rhapsody
       # when /rhapsody.com$/
       #   song = process_rhapsody_url(url)
@@ -86,11 +90,13 @@ dj help url - Show the URL types I can process into songs
       # this will also mean that we'll need the user to supply the
       # song information, and we'll set the ID3 tags.
       # when /youtube.com$/
+      when /dropbox.com$|dropboxusercontent.com$|localhost$/
+        song = Song.process_cloudstorage_url(url)
       else
         # TODO support cloud storage
         # this one will be harder and will
         # require us to download the mp3 file
-        error("Don't know how to process URLs for #{URI(url).host}")
+        msg.reply("Don't know how to process URLs for #{URI(url).host}")
         return
     end
 
@@ -226,95 +232,7 @@ dj help url - Show the URL types I can process into songs
     end
   end
 
-  # @param [String] url URL to an mp3 file
-  # @return [Song] populated if request is valid
-  #   nil otherwise
-  # TODO
-  # will require us to download the mp3 file
-  # and analyze the id3 data
-  def process_cloudstorage_url(url)
 
-  end
-
-  # TODO move the special URL handlers to their own class
-  # @param [String] url Amazon URL of the specific song
-  #
-  # @return [Song] populated if request is valid
-  #   nil otherwise
-  def process_amazon_url(url)
-
-    song = Song.new()
-
-    itemid = URI(url).path.split('/')[2]
-    resp_hash = Hash.new
-
-    begin
-      response = @amazon.item_lookup(
-          query: {
-              'ItemId'           => itemid,
-              'ResponseGroup'    => %w(RelatedItems Small).join(','),
-              'RelationshipType' => 'Tracks'
-          }
-      )
-
-      resp_hash = response.to_h
-      if resp_hash['ItemLookupResponse']['Items']['Request']['Errors']
-        raise resp_hash['ItemLookupResponse']['Items']['Request']['Errors']['Error']['Message']
-      end
-    rescue Exception => e
-      error("Amazon request failed: #{e.message}")
-      song.error = e
-      return song
-    end
-
-    item = resp_hash['ItemLookupResponse']['Items']['Item']
-
-    song.title  = item['ItemAttributes']['Title']
-    song.artist = item['ItemAttributes']['Creator']['__content__']
-    song.album  = item['RelatedItems']['RelatedItem']['Item']['ItemAttributes']['Title']
-    song.url    = item['DetailPageURL']
-
-    return song
-
-  end
-
-  # TODO error handling
-  # @param [String] url Spotify URL of the specific song
-  #
-  # @return [Song] populated if request is valid
-  #   nil otherwise
-  def process_spotify_url(url)
-
-    song = Song.new
-
-    # https://play.spotify.com/track/68y4C6DGkdX0C9DjRbKB2g
-    itemid = URI(url).path.split('/')[2]
-
-    begin
-      track = RSpotify::Track.find(itemid)
-    rescue Exception => e
-      error("Spotify request failed: #{e.message}")
-      song.error = e
-      return song
-    end
-
-    song.artist = track.artists[0].name
-    song.title = track.name
-    song.album = track.album.name
-    song.url = url
-
-    return song
-
-  end
-
-  # TODO Handle Rhapsody URLs
-  # @param [String] url Rhapsody URL of the specific song
-  #
-  # @return [Song] populated if request is valid
-  #   nil otherwise
-  def process_rhapsody_url(url)
-
-  end
 
   # @param [User] user The user to check for admin status
   # @return [Boolean] true if user is admin, false otherwise

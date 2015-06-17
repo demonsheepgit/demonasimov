@@ -61,10 +61,7 @@ class Requests
   #
   # @return [SongStruct]
   def get(nick, id)
-    puts "looking for requests for #{nick}"
-    pp @requests[nick]
     return nil if @requests[nick].nil?
-    puts "looking for request ##{id}"
     return nil if @requests[nick][id.to_i].nil?
 
     return @requests[nick][id.to_i]
