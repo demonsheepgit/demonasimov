@@ -1,5 +1,8 @@
+require 'open-uri'
+
 class Song
 
+  # TODO: enforce limits on the input
   attr_accessor :title
   attr_accessor :artist
   attr_accessor :album
@@ -15,6 +18,43 @@ class Song
     s << " (Remarks: #{remarks})" if remarks
     s << " #{shorten(url)}" if url
     s
+  end
+
+  def initialize(
+      title   = nil,
+      artist  = nil,
+      album   = nil,
+      remarks = nil,
+      url     = nil
+  )
+    @title   = title
+    @artist  = artist
+    @album   = album
+    @remarks = remarks
+    @url     = url
+  end
+
+  def to_json(*a)
+    {
+        'json_class' => self.class.name,
+        'data' => {
+            :title    => title,
+            :artist   => artist,
+            :album    => album,
+            :remarks  => remarks,
+            :url      => url
+        }
+    }.to_json(*a)
+  end
+
+  def self.json_create(*o)
+    new(
+       o[0]['data']['title'],
+       o[0]['data']['artist'],
+       o[0]['data']['album'],
+       o[0]['data']['remarks'],
+       o[0]['data']['url']
+    )
   end
 
   def set_element(key, value)
@@ -33,7 +73,6 @@ class Song
   end
 
   def shorten(url)
-
     # cache the short URL
     return @short_url unless @short_url.nil?
 

@@ -97,8 +97,12 @@ dj help url - Show the URL types I can process into songs
     end
 
     unless song.error.is_a?(Exception)
-      id = @requests.add(msg.user.nick, song)
-      msg.reply("Added request: ##{id}: #{song.to_s}")
+      song_id = nil
+      synchronize(:request_sync) do
+        song_id = @requests.add(msg.user.nick, song)
+      end
+
+      msg.reply("Added request: ##{song_id}: #{song.to_s}")
     else
       msg.reply("Uh oh, something went wrong: #{song.error.message}")
     end
@@ -128,8 +132,12 @@ dj help url - Show the URL types I can process into songs
     if song.title.nil? || song.artist.nil?
       msg.reply('You must supply at least title and artist')
     else
-      id = @requests.add(msg.user.nick, song)
-      msg.reply("Added request ##{id}: #{song.to_s}")
+      song_id = nil
+      synchronize(:request_sync) do
+        song_id = @requests.add(msg.user.nick, song)
+      end
+
+      msg.reply("Added request ##{song_id}: #{song.to_s}")
     end
   end
 
@@ -150,7 +158,10 @@ dj help url - Show the URL types I can process into songs
     end
 
     song.set_element(key, val.strip)
-    @requests.update(msg.user.nick, id, song)
+    synchronize(:request_sync) do
+      @requests.update(msg.user.nick, id, song)
+    end
+
     msg.reply("Updated #{key} for request ##{id}")
   end
 
@@ -160,6 +171,9 @@ dj help url - Show the URL types I can process into songs
 
     song = @requests.get(msg.user.nick, id)
 
+    puts "got song:"
+    puts song
+
     if song.nil?
       msg.reply "Can't find request ##{id}"
       return
@@ -167,10 +181,14 @@ dj help url - Show the URL types I can process into songs
 
     # save the title and artist for our reply message
     # before calling for the request to be deleted
+
     deleted_title = song.title
     deleted_artist = song.artist
 
-    @requests.remove(msg.user.nick, id)
+    synchronize(:request_sync) do
+      @requests.remove(msg.user.nick, id)
+    end
+
     msg.reply("Dropped request ##{id}, #{deleted_title} by #{deleted_artist}")
   end
 

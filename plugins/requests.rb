@@ -1,14 +1,18 @@
 require 'date'
 require 'open-uri'
 require 'pp'
+require 'redis'
+require 'json'
 require_relative 'song'
 
 class Requests
 
   def initialize(*args)
     super
+
+    @redis = Redis.new
+
     @next_show_date = get_next_show_date()
-    puts "Ready for show #{@next_show_date}"
     @requests = load_requests(@next_show_date)
 
   end
@@ -18,13 +22,16 @@ class Requests
   #
   # @return [int] the int id of the song added
   #   nil otherwise
+  # TODO make thread safe
   def add(nick, song)
+
     @requests[nick] = {} unless @requests.key?(nick)
     song_id = @requests[nick].length + 1
     @requests[nick][song_id] = song
 
-    puts "Added request #{nick}|#{song_id}|#{song}"
+    save_requests
 
+    puts "Added request #{nick}|#{song_id}|#{song}"
     return song_id
   end
 
@@ -32,6 +39,7 @@ class Requests
   # @param id [int] the song to be removed
   #
   # @return void
+  # TODO make thread safe
   def remove(nick, id)
     return if @requests[nick].nil?
     return if @requests[nick][id.to_i].nil?
@@ -45,6 +53,8 @@ class Requests
       idx += 1
     end
 
+    save_requests
+
   end
 
   # Fetch the requested song
@@ -53,7 +63,10 @@ class Requests
   #
   # @return [SongStruct]
   def get(nick, id)
+    puts "looking for requests for #{nick}"
+    pp @requests[nick]
     return nil if @requests[nick].nil?
+    puts "looking for request ##{id}"
     return nil if @requests[nick][id.to_i].nil?
 
     return @requests[nick][id.to_i]
@@ -65,11 +78,13 @@ class Requests
   # @param song [SongStruct] the updated song
   #
   # @return void
+  # TODO make thread safe
   def update(nick, id, song)
     return if @requests[nick].nil?
     return if @requests[nick][id.to_i].nil?
 
     @requests[nick][id.to_i] = song
+
   end
 
   # @param nick [String] user's nick or nil for all users
@@ -104,15 +119,29 @@ class Requests
 
   # Write the data out to the persistence layer (ie redis)
   # @return void
+  # TODO Handle thread sync
+  # TODO set up a periodic save
+  # TODO request a save on exit
   def save_requests
+    #  puts @requests.to_json
+    @redis.set("requests-#{@next_show_date}", @requests.to_json)
   end
 
   # Retrieve the data from the persistence layer (ie redis)
-  # @param showdate [Date]
+  # @param show_date [Date]
   #
   # @return [Hash]
-  def load_requests(showdate)
-    return {}
+  def load_requests(show_date)
+    request_data = @redis.get("requests-#{show_date}")
+    if request_data.nil?
+      return {}
+    else
+      # convert the string representations of the id to an integer
+      json_data = JSON.parse(request_data, :create_additions => true)
+
+      return json_data
+    end
+
   end
 
   # Calculate the next/upcoming show date
