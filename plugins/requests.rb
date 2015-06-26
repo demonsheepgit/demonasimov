@@ -68,6 +68,8 @@ class Requests
   end
 
   # Replace/update the song identified by id
+  # This allows updating the remarks, adding an
+  # album title, etc
   # @param nick [String] user nick
   # @param id [int] the request to be modified
   # @param song [SongStruct] the updated song

@@ -1,77 +1,96 @@
 require 'open-uri'
 require 'vacuum' # amazon
 require 'rspotify' #spotify
+require 'digest'
+require 'taglib'
+require 'public_suffix'
 
 class Song
 
-  MAX_STR_LENGTH = 96
+  MAX_STR_LENGTH = 72
   MAX_URL_LENGTH = 256
   MAX_REMARKS_LENGTH = 256
-  MAX_FILESIZE = 15728640 # 15MB
   ONE_MB = 1048576 # 1MB
+  MAX_FILESIZE = ONE_MB
+  # MAX_FILESIZE = 15728640 # 15MB
+
+
   attr_reader :title
   attr_reader :artist
   attr_reader :album
   attr_reader :remarks
   attr_reader :url
-  attr_reader :state
-  attr_accessor :error
+  attr_reader :short_url
 
-  @short_url
+  # TODO make this a reader only
+  attr_accessor :filename
+  # TODO make this a reader only
+  attr_accessor :state
+  attr_accessor :error
+  attr_accessor :thread
 
   def to_s
     s = "#{title} by #{artist}"
     s << " on #{album}" if album
     s << " (Remarks: #{remarks})" if remarks
-    s << " #{shorten(url)}" if url
+    s << " #{short_url}" if short_url
     s
   end
 
   def initialize(
-      title   = nil,
-      artist  = nil,
-      album   = nil,
-      remarks = nil,
-      url     = nil
+      title     = nil,
+      artist    = nil,
+      album     = nil,
+      remarks   = nil,
+      url       = nil,
+      short_url = nil,
+      filename  = nil
   )
 
-    @title   = title
-    @artist  = artist
-    @album   = album
-    @remarks = remarks
-    @url     = url
+    @title      = title
+    @artist     = artist
+    @album      = album
+    @remarks    = remarks
+    @url        = url
+    @short_url  = short_url
+    @filename   = filename
+
     @state = nil
+    @thread
   end
 
   def title=(value)
-    @title = value.slice(0..MAX_STR_LENGTH)
+    @title = value.nil? ? nil : value.slice(0..MAX_STR_LENGTH)
   end
 
   def artist=(value)
-    @artist = value.slice(0..MAX_STR_LENGTH)
+    @artist = value.nil? ? nil : value.slice(0..MAX_STR_LENGTH)
   end
 
   def album=(value)
-    @album = value.slice(0..MAX_STR_LENGTH)
+    @album = value.nil? ? nil : value.slice(0..MAX_STR_LENGTH)
   end
 
   def url=(value)
+    @short_url = self.shorten_url(value)
     @url = value.slice(0..MAX_URL_LENGTH)
   end
 
   def remarks=(value)
-    @remarks = value.slice(0..MAX_REMARKS_LENGTH)
+    @remarks = value.nil? ? nil : value.slice(0..MAX_REMARKS_LENGTH)
   end
 
   def to_json(*a)
     {
-        'json_class' => self.class.name,
-        'data' => {
-            :title    => title,
-            :artist   => artist,
-            :album    => album,
-            :remarks  => remarks,
-            :url      => url
+        :json_class => self.class.name,
+        :data => {
+            :title      => title,
+            :artist     => artist,
+            :album      => album,
+            :remarks    => remarks,
+            :url        => url,
+            :short_url  => short_url,
+            :filename   => filename
         }
     }.to_json(*a)
   end
@@ -82,26 +101,30 @@ class Song
        o[0]['data']['artist'],
        o[0]['data']['album'],
        o[0]['data']['remarks'],
-       o[0]['data']['url']
+       o[0]['data']['url'],
+       o[0]['data']['short_url'],
+       o[0]['data']['filename']
     )
   end
 
   def set_element(key, value)
     case key
       when 'title'
-        self.title = value
+        @title = value
       when 'album'
-        self.album = value
+        @album = value
       when 'artist'
-        self.artist = value
+        @artist = value
       when 'url'
-        self.url = value
+        @url = value
       when 'remarks'
-        self.remarks = value
+        @remarks = value
+      else
+        nil
     end
   end
 
-  def shorten(url)
+  def shorten_url(url)
     # cache the short URL
     return @short_url unless @short_url.nil?
 
@@ -123,7 +146,7 @@ class Song
   #   nil otherwise
   def self.process_amazon_url(url)
 
-    song = Song.new()
+    song = Song.new
 
     itemid = URI(url).path.split('/')[2]
     resp_hash = Hash.new
@@ -131,9 +154,9 @@ class Song
     begin
       response = @amazon.item_lookup(
           query: {
-              'ItemId'           => itemid,
-              'ResponseGroup'    => %w(RelatedItems Small).join(','),
-              'RelationshipType' => 'Tracks'
+              :ItemId => itemid,
+              :ResponseGroup => %w(RelatedItems Small).join(','),
+              :RelationshipType => 'Tracks'
           }
       )
 
@@ -197,64 +220,6 @@ class Song
 
   end
 
-  # @param [String] url URL to an mp3 file
-  # @return [Song] populated if request is valid
-  #   nil otherwise
-  # TODO implement me
-  # will require us to download the mp3 file
-  # and analyze the id3 data
-  # https://dl.dropboxusercontent.com/u/36902/dfm_allrequest/20150328/03282015-Llamas_with_Hats.mp3
-  def self.process_cloudstorage_url(url)
-    song = Song.new(nil, nil, nil, nil, url)
-    song = Song._error_check(song)
 
-    if song.error.is_a?(Exception)
-      return song
-    end
 
-    song.title = '(downloading)'
-
-    return song
-  end
-
-  def self.get_remote_size(uri)
-    begin
-      http = Net::HTTP.start(uri.host)
-
-      resp = http.head(uri.path)
-      size = resp['content-length'].to_i
-      http.finish
-    rescue Exception => e
-      puts "Could not determine size of file at #{uri}: #{e.message}"
-      return -1
-    end
-
-    return size
-
-  end
-
-  def self._error_check(song)
-    begin
-      unless song.url =~ URI::regexp
-        raise 'Invalid URL or URL format unknown'
-      end
-
-      uri = URI.parse(song.url)
-
-      unless uri.path.end_with? '.mp3'
-        raise 'Cloud storage URL must point directly to an mp3 file'
-      end
-
-      unless Song.get_remote_size(uri) <= MAX_FILESIZE
-        raise "File must be less than #{MAX_FILESIZE / ONE_MB}MB"
-      end
-
-    rescue Exception => e
-      puts e.backtrace.pretty_inspect
-      song.error = e
-    end
-
-    return song
-  end
-  #@_private
 end

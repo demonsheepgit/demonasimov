@@ -6,7 +6,7 @@ require_relative 'requests'
 
 
 # Accept and remember DFM all request show requests
-class Cinch::Request_line
+class Cinch::DJ
   include Cinch::Plugin
 
   set :help, <<-EOF
@@ -14,6 +14,7 @@ dj request http:... - Request a song by URL (Currently supported: Amazon, Spotif
 dj request title:<title> artist:<artist> (album:<album>) - request a song by name
 dj list requests - list your current requests
 dj drop request <N> - forget request number <N> (see list requests to get <N>)
+dj clear - forget all of your requests
 dj set title <N> <title> - change the title of request <N>
 dj set artist <N> <artist> - change the artist of request <N>
 dj set album <N> <album> - add/change the album of request <N>
@@ -29,6 +30,7 @@ dj help url - Show the URL types I can process into songs
   match /list requests\s*$/,                        :method => :list_requests
   match /count requests\s*$/,                       :method => :count_requests
   match /drop request\s+(\d)\s*$/,                  :method => :drop_request
+  match /clear(\s*.*)\s*$/,                         :method => :clear_requests
   match /set (title|artist|album)\s+(\d)\s+(.*)/,   :method => :set_song_param
   match /set (remarks|url)\s+(\d)\s+(.*)/,          :method => :set_song_param
   match /email requests\s*$/,                       :method => :email_requests
@@ -39,7 +41,9 @@ dj help url - Show the URL types I can process into songs
   def initialize(*args)
     super
     @requests = Requests.new
-    @admins = ['demonsheep']
+    # TODO: SET THIS TO something reasonable BEFORE PRODUCTION
+    # TODO: make this dynamically settable at runtime
+    @admins = %w(demonsheep rhornsby guest74)
     @amazon = Vacuum.new
     # A single user cannot have more than max_requests
     @max_requests = 5
@@ -85,17 +89,14 @@ dj help url - Show the URL types I can process into songs
       # TODO support rhapsody
       # when /rhapsody.com$/
       #   song = process_rhapsody_url(url)
-      # TODO support youtube
-      # download the mp3 audio using youtube-dl
-      # this will also mean that we'll need the user to supply the
-      # song information, and we'll set the ID3 tags.
-      # when /youtube.com$/
-      when /dropbox.com$|dropboxusercontent.com$|localhost$/
-        song = Song.process_cloudstorage_url(url)
+
       else
         # TODO support cloud storage
         # this one will be harder and will
         # require us to download the mp3 file
+        # TODO make this count against the max_requests
+        # so that a user can't send the same download request
+        # a bunch of times.
         msg.reply("Don't know how to process URLs for #{URI(url).host}")
         return
     end
@@ -120,7 +121,7 @@ dj help url - Show the URL types I can process into songs
       return
     end
 
-    song = Song.new()
+    song = Song.new
     tokens = subject.split(/(title|album|artist|remarks):\s*/)
 
     valid_tokens = %w(title artist album remarks)
@@ -193,6 +194,28 @@ dj help url - Show the URL types I can process into songs
     msg.reply("Dropped request ##{id}, #{deleted_title} by #{deleted_artist}")
   end
 
+  def clear_requests(msg, subject)
+
+    subject.strip!
+
+    unless subject.empty? || is_admin?(msg.user)
+      msg.reply "You're not an admin!"
+      return
+    end
+
+    target = subject.empty? ? msg.user.nick : subject
+
+    synchronize(:request_sync) do
+      while @requests.count(target) > 0 do
+        @requests.remove(target, 1)
+      end
+    end
+
+    (target == msg.user.nick) ? msg.reply('Requests cleared.') : msg.reply("Requests for #{target} cleared.")
+
+  end
+
+
   # Tell the user what songs they've requested for this week
   # Each request should have a prefix sequence id # to allow
   # them to drop a request from the list
@@ -228,7 +251,6 @@ dj help url - Show the URL types I can process into songs
     # only allow admins to complete this command
     unless is_admin?(msg.user)
       msg.reply("You're not an admin!")
-      return
     end
   end
 
@@ -239,7 +261,9 @@ dj help url - Show the URL types I can process into songs
   def is_admin?(user)
     user.refresh # be sure to refresh the data, or someone could steal
     # the nick
-    @admins.include?(user.authname)
+    # TODO: SET THIS TO user.authname BEFORE PRODUCTION
+    # without nickserv, there is no authname
+    @admins.include?(user.nick.downcase)
   end
 
 end

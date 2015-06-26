@@ -5,13 +5,13 @@ require 'open3'
 require 'yaml'
 
 # Plugins
-require 'cinch/plugins/fortune'
+# require 'cinch/plugins/fortune'
 require_relative 'plugins/nowplaying'
-require_relative 'plugins/request_line'
+require_relative 'plugins/dj'
 
-Cinch::Plugins::Fortune.configure do |config|
-  config.max_length=160
-end
+#Cinch::Plugins::Fortune.configure do |config|
+#  config.max_length=160
+#end
 
 config = YAML.load_file('dsbot.yml')
 
@@ -36,15 +36,15 @@ bot = Cinch::Bot.new do
         :twitter_access_token => config['twitter']['access_token'],
         :twitter_access_token_secret=> config['twitter']['access_token_secret']
     }
-    param.plugins.options[Cinch::Request_line] = {
+    param.plugins.options[Cinch::DJ] = {
         :aws_access_key_id  => config['amazon']['aws_access_key_id'],
         :aws_secret_access_key  => config['amazon']['aws_secret_access_key']
     }
 
     param.plugins.plugins = [
         Cinch::NowPlaying,
-        Cinch::Plugins::Fortune,
-        Cinch::Request_line
+        # Cinch::Plugins::Fortune,
+        Cinch::DJ
     ]
   end
 
