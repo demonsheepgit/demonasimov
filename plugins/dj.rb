@@ -6,21 +6,8 @@ require_relative 'requests'
 
 
 # Accept and remember DFM all request show requests
-class Cinch::DJ
+class Cinch::Plugin::DJ
   include Cinch::Plugin
-
-  set :help, <<-EOF
-dj request http:... - Request a song by URL (Currently supported: Amazon, Spotify)
-dj request title:<title> artist:<artist> (album:<album>) - request a song by name
-dj list requests - list your current requests
-dj drop request <N> - forget request number <N> (see list requests to get <N>)
-dj clear - forget all of your requests
-dj set title <N> <title> - change the title of request <N>
-dj set artist <N> <artist> - change the artist of request <N>
-dj set album <N> <album> - add/change the album of request <N>
-dj add remarks <N> <remarks> - add/change remarks (year, etc) to request number <N>
-dj help url - Show the URL types I can process into songs
-  EOF
 
   set :prefix, /^dj\s+/
 
@@ -34,7 +21,9 @@ dj help url - Show the URL types I can process into songs
   match /set (title|artist|album)\s+(\d)\s+(.*)/,   :method => :set_song_param
   match /set (remarks|url)\s+(\d)\s+(.*)/,          :method => :set_song_param
   match /email requests\s*$/,                       :method => :email_requests
-  match /help url\s*/,                              :method => :help_url
+  match /help\s*$/,                         :method => :show_help
+  match /help urls\s*/,                     :method => :help_urls
+
   # match isn't functioning ... we need to match on 'help' and only 'help'
   # match /^dj\s+help\s*$/,         :method => :help, :prefix => nil
 
@@ -57,26 +46,41 @@ dj help url - Show the URL types I can process into songs
     )
   end
 
-  def help(msg)
-    msg.reply 'Help:'
-    msg.reply(:help)
+  def show_help(msg)
+    help_content = <<-EOF
+dj request <http://...> - Request a song by URL (Currently supported: Amazon, Spotify)
+dj request title:<title> artist:<artist> (album:<album>) - request a song by name
+dj list requests - list your current requests
+dj drop request <N> - forget request number <N> (see list requests to get <N>)
+dj clear - forget all of your requests
+dj set title <N> <title> - change the title of request <N>
+dj set artist <N> <artist> - change the artist of request <N>
+dj set album <N> <album> - add/change the album of request <N>
+dj add remarks <N> <remarks> - add/change remarks (year, etc) to request number <N>
+dj help urls - Show the URL types I can process into songs
+EOF
+    _private_reply(msg, help_content)
   end
 
-  def help_url(msg)
-    msg.reply('The following URLs/sites are supported:')
-    msg.reply('Amazon, Spotify')
+  def help_urls(msg)
+    help_content = <<-EOF
+The following URLs/sites are supported:
+* Amazon  - example URL: http://www.amazon.com/dp/B00Q804ADY
+* Spotify - example URL: http://play.spotify.com/track/68y4C6DGkdX0C9DjRbKB2g
+EOF
+    _private_reply(msg, help_content)
   end
 
   # Allow a user to create a new request by giving a url
   def add_request_by_url(msg, url)
 
     unless @requests.count(msg.user.nick) < @max_requests
-      msg.reply('You already have the maximum number of requests.')
+      _address_reply(msg, 'You already have the maximum number of requests.')
       return
     end
 
     unless url =~ URI::regexp
-      msg.reply('Invalid URL')
+      _address_reply(msg, 'Invalid URL')
       return
     end
 
@@ -97,19 +101,19 @@ dj help url - Show the URL types I can process into songs
         # TODO make this count against the max_requests
         # so that a user can't send the same download request
         # a bunch of times.
-        msg.reply("Don't know how to process URLs for #{URI(url).host}")
+        _address_reply(msg, "Don't know how to process URLs for #{URI(url).host}")
         return
     end
 
     if song.error.is_a?(Exception)
-      msg.reply("Uh oh, something went wrong: #{song.error.message}")
+      _address_reply(msg, "Uh oh, something went wrong: #{song.error.message}")
     else
       song_id = nil
       synchronize(:request_sync) do
         song_id = @requests.add(msg.user.nick, song)
       end
 
-      msg.reply("Added request: ##{song_id}: #{song.to_s}")
+      _address_reply(msg, "Added request: ##{song_id}: #{song.to_s}")
     end
 
   end
@@ -117,7 +121,7 @@ dj help url - Show the URL types I can process into songs
   def add_request_by_name(msg,subject)
 
     if @requests.count(msg.user.nick) >= @max_requests
-      msg.reply('You already have the maximum number of requests.')
+      _address_reply(msg, 'You already have the maximum number of requests.')
       return
     end
 
@@ -135,14 +139,14 @@ dj help url - Show the URL types I can process into songs
     end
 
     if song.title.nil? || song.artist.nil?
-      msg.reply('You must supply at least title and artist')
+      _address_reply(msg, 'You must supply at least title and artist')
     else
       song_id = nil
       synchronize(:request_sync) do
         song_id = @requests.add(msg.user.nick, song)
       end
 
-      msg.reply("Added request ##{song_id}: #{song.to_s}")
+      _address_reply(msg, "Added request ##{song_id}: #{song.to_s}")
     end
   end
 
@@ -158,7 +162,7 @@ dj help url - Show the URL types I can process into songs
     song = @requests.get(msg.user.nick, id)
 
     if song.nil?
-      msg.reply("Can't find song ##{id} for #{msg.user.nick}")
+      _address_reply(msg, "Can't find song ##{id} for #{msg.user.nick}")
       return
     end
 
@@ -167,7 +171,7 @@ dj help url - Show the URL types I can process into songs
       @requests.update(msg.user.nick, id, song)
     end
 
-    msg.reply("Updated #{key} for request ##{id}")
+    _address_reply(msg, "Updated #{key} for request ##{id}")
   end
 
   # Allow a user to drop one of their requests
@@ -177,7 +181,7 @@ dj help url - Show the URL types I can process into songs
     song = @requests.get(msg.user.nick, id)
 
     if song.nil?
-      msg.reply "Can't find request ##{id}"
+      _address_reply(msg, "Can't find request ##{id}")
       return
     end
 
@@ -191,7 +195,7 @@ dj help url - Show the URL types I can process into songs
       @requests.remove(msg.user.nick, id)
     end
 
-    msg.reply("Dropped request ##{id}, #{deleted_title} by #{deleted_artist}")
+    _address_reply(msg, "Dropped request ##{id}, #{deleted_title} by #{deleted_artist}")
   end
 
   def clear_requests(msg, subject)
@@ -199,7 +203,7 @@ dj help url - Show the URL types I can process into songs
     subject.strip!
 
     unless subject.empty? || is_admin?(msg.user)
-      msg.reply "You're not an admin!"
+      _private_reply(msg.user, 'Only admins may clear requests for other users')
       return
     end
 
@@ -215,7 +219,6 @@ dj help url - Show the URL types I can process into songs
 
   end
 
-
   # Tell the user what songs they've requested for this week
   # Each request should have a prefix sequence id # to allow
   # them to drop a request from the list
@@ -227,7 +230,7 @@ dj help url - Show the URL types I can process into songs
     return if request_list.count == 0
 
     request_list.each do |id, song|
-      msg.reply("##{id}) #{song.to_s}")
+      _address_reply(msg, "##{id}) #{song.to_s}")
     end
   end
 
@@ -237,11 +240,11 @@ dj help url - Show the URL types I can process into songs
     count = @requests.count(msg.user.nick)
     case count
       when 0
-        msg.reply('You have no requests.')
+        _address_reply(msg, 'You have no requests.')
       when 1
-        msg.reply("You have #{count} request.")
+        _address_reply(msg, "You have #{count} request.")
       else
-        msg.reply("You have #{count} requests.")
+        _address_reply(msg, "You have #{count} requests.")
     end
 
   end
@@ -250,11 +253,9 @@ dj help url - Show the URL types I can process into songs
   def email_requests(msg)
     # only allow admins to complete this command
     unless is_admin?(msg.user)
-      msg.reply("You're not an admin!")
+      _address_reply(msg, "You're not an admin!")
     end
   end
-
-
 
   # @param [User] user The user to check for admin status
   # @return [Boolean] true if user is admin, false otherwise
@@ -266,4 +267,14 @@ dj help url - Show the URL types I can process into songs
     @admins.include?(user.nick.downcase)
   end
 
+  def _private_reply(msg, text)
+    User(msg.user.nick).send(text)
+  end
+
+  def _address_reply(msg, text)
+    prefix = msg.channel ? "#{msg.user.nick}: " : nil
+    msg.reply("#{prefix}#{text}")
+  end
+
 end
+
