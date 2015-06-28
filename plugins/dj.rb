@@ -32,7 +32,7 @@ class Cinch::Plugin::DJ
     @requests = Requests.new
     # TODO: SET THIS TO something reasonable BEFORE PRODUCTION
     # TODO: make this dynamically settable at runtime
-    @admins = %w(demonsheep rhornsby guest74)
+    @admins = %w(demonsheep)
     @amazon = Vacuum.new
     # A single user cannot have more than max_requests
     @max_requests = 5
@@ -74,8 +74,8 @@ EOF
   # Allow a user to create a new request by giving a url
   def add_request_by_url(msg, url)
 
-    unless @requests.count(msg.user.nick) < @max_requests
-      _address_reply(msg, 'You already have the maximum number of requests.')
+    unless _request_allowed(msg.user.nick, :add).nil?
+      _address_reply(msg, _request_allowed(msg.user.nick, :add))
       return
     end
 
@@ -106,7 +106,7 @@ EOF
     end
 
     if song.error.is_a?(Exception)
-      _address_reply(msg, "Uh oh, something went wrong: #{song.error.message}")
+      _address_reply(msg, "There was a problem adding your request: #{song.error.message}")
     else
       song_id = nil
       synchronize(:request_sync) do
@@ -120,10 +120,15 @@ EOF
 
   def add_request_by_name(msg,subject)
 
-    if @requests.count(msg.user.nick) >= @max_requests
-      _address_reply(msg, 'You already have the maximum number of requests.')
+    unless _request_allowed(msg.user.nick, :add).nil?
+      _address_reply(msg, _request_allowed(msg.user.nick, :add))
       return
     end
+
+    #if @requests.count(msg.user.nick) >= @max_requests
+    #  _address_reply(msg, 'You already have the maximum number of requests.')
+    #  return
+    #end
 
     song = Song.new
     tokens = subject.split(/(title|album|artist|remarks):\s*/)
@@ -152,6 +157,11 @@ EOF
 
   def set_song_param(msg, key, id, val)
 
+    unless _request_allowed(msg.user.nick, :modify).nil?
+      _address_reply(msg, _request_allowed(msg.user.nick, :modify))
+      return
+    end
+
     # TODO handle modifying the URL separately
     # The URL should only be settable if it isn't
     # already set -
@@ -178,6 +188,11 @@ EOF
   # They must specify the sequence id #
   def drop_request(msg, id)
 
+    unless _request_allowed(msg.user.nick, :delete).nil?
+      _address_reply(msg, _request_allowed(msg.user.nick, :delete))
+      return
+    end
+
     song = @requests.get(msg.user.nick, id)
 
     if song.nil?
@@ -199,6 +214,11 @@ EOF
   end
 
   def clear_requests(msg, subject)
+
+    unless _request_allowed(msg.user.nick, :delete).nil?
+      _address_reply(msg, _request_allowed(msg.user.nick, :delete))
+      return
+    end
 
     subject.strip!
 
@@ -265,6 +285,21 @@ EOF
     # TODO: SET THIS TO user.authname BEFORE PRODUCTION
     # without nickserv, there is no authname
     @admins.include?(user.nick.downcase)
+  end
+
+  def _request_allowed(nick, action)
+
+    # Deadline should always be the first.
+    if @requests.past_deadline?
+      return 'The request line for this week is closed.'
+    end
+
+    if action == :add && @requests.count(nick) >= @max_requests
+      return "A maximum of #{@max_requests} requests are allowed."
+    end
+
+    nil
+
   end
 
   def _private_reply(msg, text)

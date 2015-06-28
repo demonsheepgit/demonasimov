@@ -7,12 +7,11 @@ require 'public_suffix'
 
 class Song
 
-  MAX_STR_LENGTH = 72
+  MAX_STR_LENGTH = 64
   MAX_URL_LENGTH = 256
-  MAX_REMARKS_LENGTH = 256
+  MAX_REMARKS_LENGTH = 128
   ONE_MB = 1048576 # 1MB
-  MAX_FILESIZE = ONE_MB
-  # MAX_FILESIZE = 15728640 # 15MB
+  MAX_FILESIZE = 15728640 # 15MB
 
 
   attr_reader :title

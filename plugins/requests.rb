@@ -7,12 +7,13 @@ require_relative 'song'
 
 class Requests
 
+  SATURDAY = 6
+
   def initialize(*args)
     super
 
     @redis = Redis.new
-
-    @next_show_date = get_next_show_date()
+    @next_show_date = next_show_date()
     @requests = load_requests(@next_show_date)
 
   end
@@ -148,13 +149,20 @@ class Requests
   # Calculate the next/upcoming show date
   #
   # @return [Date] date of the upcoming Saturday
-  def get_next_show_date
-    saturday = 6
-    interval = saturday - Date.today().wday
-    interval = saturday if (interval < 0)
+  def next_show_date
+
+    interval = SATURDAY - Date.today().wday
+    interval = SATURDAY if (interval < 0)
 
     return Date.today() + interval
 
   end
+
+  def past_deadline?
+    past_deadline = (Date.today().wday == SATURDAY && Time.now.hour > 23)
+
+    past_deadline
+  end
+
 
 end
