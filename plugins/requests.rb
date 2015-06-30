@@ -8,14 +8,19 @@ require_relative 'song'
 class Requests
 
   SATURDAY = 6
+  DEADLINE_HOUR = 9
+
+  attr_reader :show_date
 
   def initialize(*args)
     super
 
     @redis = Redis.new
-    @next_show_date = next_show_date()
-    @requests = load_requests(@next_show_date)
-
+    @lock = Mutex.new
+    @show_date = next_show_date
+    @requests = load_requests(@show_date)
+    @roller_status = nil
+    start_show_date_roller
   end
 
   # @param nick [String] user nick
@@ -24,14 +29,13 @@ class Requests
   # @return [int] the int id of the song added
   #   nil otherwise
   def add(nick, song)
-
     @requests[nick] = {} unless @requests.key?(nick)
     song_id = @requests[nick].length + 1
     @requests[nick][song_id] = song
 
     save_requests
 
-    return song_id
+    song_id
   end
 
   # @param nick [String] user nick
@@ -53,7 +57,6 @@ class Requests
     end
 
     save_requests
-
   end
 
   # Fetch the requested song
@@ -65,7 +68,7 @@ class Requests
     return nil if @requests[nick].nil?
     return nil if @requests[nick][id.to_i].nil?
 
-    return @requests[nick][id.to_i]
+    @requests[nick][id.to_i]
   end
 
   # Replace/update the song identified by id
@@ -81,7 +84,6 @@ class Requests
     return if @requests[nick][id.to_i].nil?
 
     @requests[nick][id.to_i] = song
-
   end
 
   # @param nick [String] user's nick or nil for all users
@@ -90,11 +92,10 @@ class Requests
   #    or the total request count if nil
   #   nil otherwise
   def count(nick=nil)
-
     return 0 if @requests[nick].nil?
 
     count_request = 0
-    if (nick.nil?)
+    if nick.nil?
       @requests.each do |nick|
         count_request += @requests[nick].length
       end
@@ -102,34 +103,32 @@ class Requests
       count_request = @requests[nick].length
     end
 
-    return count_request
+    count_request
   end
 
   # List the songs requested for the nick
   # @param nick [String] user's nick
   #
-  # @return [Array] of the user's requests
+  # @return [Hash] of the user's requests
   def list(nick)
     return {} if @requests[nick].nil?
-    return @requests[nick]
+    @requests[nick]
   end
 
   # Write the data out to the persistence layer (ie redis)
   # @return void
-  # TODO set up a periodic save
-  # TODO request a save on exit
   def save_requests
-    @redis.set("requests-#{@next_show_date}", @requests.to_json)
+    @redis.set("requests-#{@show_date}", @requests.to_json)
   end
 
   # Retrieve the data from the persistence layer (ie redis)
-  # @param show_date [Date]
+  # @param load_show_date [Date]
   #
   # @return [Hash]
-  def load_requests(show_date)
-    request_data = @redis.get("requests-#{show_date}")
+  def load_requests(load_show_date)
+    request_data = @redis.get("requests-#{load_show_date}")
     if request_data.nil?
-      return {}
+      {}
     else
 
       request_data = JSON.parse(request_data, :create_additions => true)
@@ -141,28 +140,50 @@ class Requests
         end
       end
 
-      return request_data
+      request_data
     end
-
   end
 
   # Calculate the next/upcoming show date
   #
   # @return [Date] date of the upcoming Saturday
   def next_show_date
-
     interval = SATURDAY - Date.today().wday
     interval = SATURDAY if (interval < 0)
 
     return Date.today() + interval
-
   end
 
   def past_deadline?
-    past_deadline = (Date.today().wday == SATURDAY && Time.now.hour > 23)
+    past_deadline = (Date.today() >= @show_date && Time.now.hour >= DEADLINE_HOUR)
 
     past_deadline
   end
 
+  # If necessary, roll @show_date to the next week
+  # @return void
+  def start_show_date_roller
+    if @roller_status == 'run' || @roller_status == 'sleep'
+      raise("Error in #{__method__}: roller thread already running!")
+    end
+
+    # do not join this thread, we don't care about it finishing
+    Thread.new do
+      @roller_status = Thread.current.status
+      while true do
+        sleep 600
+        if Date.today() > @show_date
+          @lock.synchronize do
+            # one last save
+            save_requests
+            # clear the requests
+            @requests = {}
+          end
+          # change the show date
+          @show_date = next_show_date
+        end
+      end
+    end
+  end
 
 end
