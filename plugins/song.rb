@@ -55,7 +55,7 @@ class Song
     @filename   = filename
 
     @state = nil
-    @thread
+    @thread = nil
   end
 
   def title=(value)
@@ -218,7 +218,5 @@ class Song
   def self.process_rhapsody_url(url)
 
   end
-
-
 
 end
