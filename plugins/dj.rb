@@ -1,4 +1,3 @@
-
 require 'uri'
 require 'open-uri'
 require 'pp'
@@ -14,6 +13,7 @@ class Cinch::Plugin::DJ
   listen_to :connect,                               :method => :on_connect
   match /request (http.*)\s*$/,                     :method => :add_request_by_url
   match /request (title:.*)$/,                      :method => :add_request_by_name
+  match /request (artist:.*)$/,                     :method => :add_request_by_name
   match /list requests\s*$/,                        :method => :list_requests
   match /count requests\s*$/,                       :method => :count_requests
   match /drop request\s+(\d)\s*$/,                  :method => :drop_request
@@ -23,9 +23,6 @@ class Cinch::Plugin::DJ
   match /email requests\s*$/,                       :method => :email_requests
   match /help\s*$/,                         :method => :show_help
   match /help urls\s*/,                     :method => :help_urls
-
-  # match isn't functioning ... we need to match on 'help' and only 'help'
-  # match /^dj\s+help\s*$/,         :method => :help, :prefix => nil
 
   def initialize(*args)
     super
@@ -50,13 +47,13 @@ class Cinch::Plugin::DJ
     help_content = <<-EOF
 dj request <http://...> - Request a song by URL (Currently supported: Amazon, Spotify)
 dj request title:<title> artist:<artist> (album:<album>) - request a song by name
-dj list requests - list your current requests
-dj drop request <N> - forget request number <N> (see list requests to get <N>)
-dj clear - forget all of your requests
 dj set title <N> <title> - change the title of request <N>
 dj set artist <N> <artist> - change the artist of request <N>
 dj set album <N> <album> - add/change the album of request <N>
-dj add remarks <N> <remarks> - add/change remarks (year, etc) to request number <N>
+dj set remarks <N> <remarks> - add/change remarks (year, etc) of request <N>
+dj list requests - list your current requests
+dj drop request <N> - forget request number <N>
+dj clear - forget all of your requests
 dj help urls - Show the URL types I can process into songs
 EOF
     _private_reply(msg, help_content)
@@ -124,11 +121,6 @@ EOF
       _address_reply(msg, _request_allowed(msg.user.nick, :add))
       return
     end
-
-    #if @requests.count(msg.user.nick) >= @max_requests
-    #  _address_reply(msg, 'You already have the maximum number of requests.')
-    #  return
-    #end
 
     song = Song.new
     tokens = subject.split(/(title|album|artist|remarks):\s*/)
@@ -262,11 +254,15 @@ EOF
       when 0
         _address_reply(msg, 'You have no requests.')
       when 1
-        _address_reply(msg, "You have #{count} request.")
+        _address_reply(msg, "You have #{count} request for the show that airs #{next_show_date}")
       else
-        _address_reply(msg, "You have #{count} requests.")
+        _address_reply(msg, "You have #{count} requests for the show that airs #{next_show_date}")
     end
 
+  end
+
+  def next_show_date
+    "#{@requests.show_date.month}/#{@requests.show_date.mday}."
   end
 
   # Compose an email to DP listing all the requests
