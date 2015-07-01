@@ -1,9 +1,4 @@
 require 'open-uri'
-require 'vacuum' # amazon
-require 'rspotify' #spotify
-require 'digest'
-require 'taglib'
-require 'public_suffix'
 
 class Song
 
