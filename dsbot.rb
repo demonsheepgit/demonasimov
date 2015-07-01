@@ -36,7 +36,7 @@ bot = Cinch::Bot.new do
         :twitter_access_token => config['twitter']['access_token'],
         :twitter_access_token_secret=> config['twitter']['access_token_secret']
     }
-    param.plugins.options[Cinch::DJ] = {
+    param.plugins.options[Cinch::Plugin::DJ] = {
         :aws_access_key_id  => config['amazon']['aws_access_key_id'],
         :aws_secret_access_key  => config['amazon']['aws_secret_access_key']
     }
@@ -44,7 +44,7 @@ bot = Cinch::Bot.new do
     param.plugins.plugins = [
         Cinch::NowPlaying,
         # Cinch::Plugins::Fortune,
-        Cinch::DJ
+        Cinch::Plugin::DJ
     ]
   end
 

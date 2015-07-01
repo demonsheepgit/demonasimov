@@ -1,7 +1,8 @@
 require 'uri'
 require 'open-uri'
 require 'pp'
-require_relative 'requests'
+require_relative 'lib/dj/requests'
+require_relative 'lib/dj/url_handlers'
 
 
 # Accept and remember DFM all request show requests
@@ -30,17 +31,12 @@ class Cinch::Plugin::DJ
     # TODO: SET THIS TO something reasonable BEFORE PRODUCTION
     # TODO: make this dynamically settable at runtime
     @admins = %w(demonsheep)
-    @amazon = Vacuum.new
     # A single user cannot have more than max_requests
     @max_requests = 5
   end
 
   def on_connect(*)
-    @amazon.configure(
-        aws_access_key_id: config[:aws_access_key_id],
-        aws_secret_access_key: config[:aws_secret_access_key],
-        associate_tag: 'tag'
-    )
+
   end
 
   def show_help(msg)
@@ -84,9 +80,9 @@ EOF
     # attempt to resolve the url to a product
     case URI(url).host
       when /amazon.com$/
-        song = Song.process_amazon_url(url)
+        song = Url_handlers.process_amazon_url(url)
       when /spotify.com$/
-        song = Song.process_spotify_url(url)
+        song = Url_handlers.process_spotify_url(url)
       # TODO support rhapsody
       # when /rhapsody.com$/
       #   song = process_rhapsody_url(url)

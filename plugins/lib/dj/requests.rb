@@ -174,12 +174,9 @@ class Requests
         sleep 600
         if Date.today() > @show_date
           @lock.synchronize do
-            # one last save
             save_requests
-            # clear the requests
             @requests = {}
           end
-          # change the show date
           @show_date = next_show_date
         end
       end
