@@ -33,6 +33,9 @@ class Cinch::Plugin::DJ
     @admins = %w(demonsheep)
     # A single user cannot have more than max_requests
     @max_requests = 5
+
+    @url_handler = Url_handlers.new(config)
+
   end
 
   def on_connect(*)
@@ -80,9 +83,9 @@ EOF
     # attempt to resolve the url to a product
     case URI(url).host
       when /amazon.com$/
-        song = Url_handlers.process_amazon_url(url)
+        song = @url_handler.process_amazon_url(url)
       when /spotify.com$/
-        song = Url_handlers.process_spotify_url(url)
+        song = @url_handler.process_spotify_url(url)
       # TODO support rhapsody
       # when /rhapsody.com$/
       #   song = process_rhapsody_url(url)
@@ -99,7 +102,7 @@ EOF
     end
 
     if song.error.is_a?(Exception)
-      _address_reply(msg, "There was a problem adding your request: #{song.error.message}")
+      _address_reply(msg, "There was a problem: #{song.error.message}")
     else
       song_id = nil
       synchronize(:request_sync) do

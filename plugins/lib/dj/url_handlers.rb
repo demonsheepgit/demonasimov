@@ -2,18 +2,24 @@ require 'vacuum' # amazon
 require 'rspotify' #spotify
 
 class Url_handlers
+
+  def initialize(config)
+    @config = config
+
+  end
+
   # TODO additional error handling
   #   ie an amazon URL that isn't a song
   # @param [String] url Amazon URL of the specific song
   #
   # @return [Song] populated if request is valid
   #   nil otherwise
-  def self.process_amazon_url(url)
+  def process_amazon_url(url)
     amazon = Vacuum.new
 
     amazon.configure(
-        aws_access_key_id: config[:aws_access_key_id],
-        aws_secret_access_key: config[:aws_secret_access_key],
+        aws_access_key_id: @config[:aws_access_key_id],
+        aws_secret_access_key: @config[:aws_secret_access_key],
         associate_tag: 'tag'
     )
 
@@ -36,8 +42,8 @@ class Url_handlers
         raise resp_hash['ItemLookupResponse']['Items']['Request']['Errors']['Error']['Message']
       end
     rescue Exception => e
-      error("Amazon request failed: #{e.message}")
-      song.error = e
+      puts("Amazon request failed: #{e.message}. URL was: #{url}")
+      song.error = Exception.new('Amazon could not be reached, or the URL provided was malformed.')
       return song
     end
 
@@ -58,7 +64,7 @@ class Url_handlers
   #
   # @return [Song] populated if request is valid
   #   nil otherwise
-  def self.process_spotify_url(url)
+  def process_spotify_url(url)
 
     song = Song.new
 
@@ -68,8 +74,13 @@ class Url_handlers
     begin
       track = RSpotify::Track.find(itemid)
     rescue Exception => e
-      error("Spotify request failed: #{e.message}")
+      puts("Spotify request failed: #{e.message}. URL was: #{url}")
       song.error = e
+      return song
+    end
+
+    if track.nil?
+      song.error = Exception.new('Spotify could not be reached, or the URL provided was malformed.')
       return song
     end
 
@@ -78,7 +89,7 @@ class Url_handlers
     song.album = track.album.name
     song.url = url
 
-    return song
+    song
 
   end
 
