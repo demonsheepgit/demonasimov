@@ -3,11 +3,13 @@
 require 'cinch'
 require 'open3'
 require 'yaml'
+require 'cinch/plugins/identify'
 
 # Plugins
 # require 'cinch/plugins/fortune'
 require_relative 'plugins/nowplaying'
 require_relative 'plugins/dj'
+
 
 #Cinch::Plugins::Fortune.configure do |config|
 #  config.max_length=160
@@ -28,6 +30,13 @@ bot = Cinch::Bot.new do
 
     # Plugin options
     param.plugins.prefix = lambda{|msg| Regexp.compile("^#{Regexp.escape(msg.bot.nick)}:?\s*")}
+
+    param.plugins.options[Cinch::Plugins::Identify] = {
+        :username => config['irc']['user'],
+        :password => config['irc']['password'],
+        :type     => :nickserv,
+    }
+
     param.plugins.options[Cinch::NowPlaying] = {
         :url => config['nowplaying']['url'],
         :mplayer => config['nowplaying']['mplayer'],
@@ -44,8 +53,14 @@ bot = Cinch::Bot.new do
     param.plugins.plugins = [
         Cinch::NowPlaying,
         # Cinch::Plugins::Fortune,
-        Cinch::Plugin::DJ
+        Cinch::Plugin::DJ,
     ]
+
+    # only include the nickserv plugin if we're not on ustream
+    unless config['irc']['server'] == 'c.ustream.tv'
+      param.plugins.plugins << Cinch::Plugins::Identify
+    end
+
   end
 
   on :channel, /bye$/ do |m|
