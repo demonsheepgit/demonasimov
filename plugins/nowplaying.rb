@@ -28,7 +28,6 @@ dj status - Report the current DJ state (on or off)
 what's playing? - Reply with the current song title/artist
 EOF
 
-
   set :required_options, [:mplayer, :url]
 
   @dj_state = false
@@ -57,11 +56,7 @@ EOF
   end
 
   def set_dj_state(msg, option)
-
     option = option == 'on' ? true : false
-
-    puts @dj_state
-    puts option
 
     if @dj_state == option
       msg.reply "DJ announcements already #{@dj_state ? 'enabled' : 'disabled'}"
@@ -100,7 +95,6 @@ EOF
   def whats_playing(msg)
     stream_title = get_stream_title()
     msg.reply "#{stream_title}"
-
   end
 
   # The "main" loop runs in this function for as long as
@@ -108,17 +102,15 @@ EOF
   def start_announcements(msg)
 
     # Need to get the current stream title as a baseline
-    prev_stream_title = nil
     stream_title = get_stream_title()
+    prev_stream_title = stream_title
 
     msg.reply "Here's what's playing on DuaneFM: #{stream_title}"
-
-    prev_stream_title = stream_title
 
     # There's probably a better way than this goofy loop to do this
     while @dj_state
       stream_title = get_stream_title()
-      if stream_title != prev_stream_title
+      if stream_title != prev_stream_title && stream_title != nil
         # delay a little before making the announcement
         # otherwise we get ahead of the music since we
         # can see the title change before the music actually
@@ -130,7 +122,9 @@ EOF
 
         prev_stream_title = stream_title
       end
+
       sleep(LOOP_INTERVAL)
+
     end
   end
 
@@ -155,13 +149,11 @@ EOF
     Open3.popen3(@mplayer_cmd) do |stdin, stdout, stderr, wait_thr|
       while line = stdout.gets
         if line.match('ICY Info:')
-          stream_title = line.split('=')[1].tr("';","")
+          stream_title = line.split('=')[1].tr("';",'')
         end
       end
     end
     return stream_title
   end
-
-
 
 end
