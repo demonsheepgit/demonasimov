@@ -118,7 +118,7 @@ EOF
     # There's probably a better way than this goofy loop to do this
     while @dj_state
       stream_title = get_stream_title()
-      if stream_title != prev_stream_title
+      if stream_title != prev_stream_title && stream_title != nil
         # delay a little before making the announcement
         # otherwise we get ahead of the music since we
         # can see the title change before the music actually
