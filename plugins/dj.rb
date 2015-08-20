@@ -22,8 +22,8 @@ class Cinch::Plugin::DJ
   match /set (title|artist|album)\s+(\d)\s+(.*)/,   :method => :set_song_param
   match /set (remarks|url)\s+(\d)\s+(.*)/,          :method => :set_song_param
   match /email requests\s*$/,                       :method => :email_requests
-  match /help\s*$/,                         :method => :show_help
-  match /help urls\s*/,                     :method => :help_urls
+  match /help\s*$/,                                 :method => :show_help
+  match /help urls\s*/,                             :method => :help_urls
 
   def initialize(*args)
     super
@@ -226,7 +226,9 @@ EOF
       end
     end
 
-    (target == msg.user.nick) ? msg.reply('Requests cleared.') : msg.reply("Requests for #{target} cleared.")
+    (target == msg.user.nick) ?
+        _address_reply(msg, 'your requests have been cleared.')
+        : msg.reply("Requests for #{target} cleared.")
 
   end
 
