@@ -15,19 +15,14 @@ class Song
   attr_reader :remarks
   attr_reader :url
   attr_reader :short_url
-
-  # TODO make this a reader only
   attr_accessor :filename
-  # TODO make this a reader only
-  attr_accessor :state
   attr_accessor :error
-  attr_accessor :thread
+
 
   def to_s
     s = "#{title} by #{artist}"
     s << " on #{album}" if album
     s << " (Remarks: #{remarks})" if remarks
-    s << " #{short_url}" if short_url
     s
   end
 
