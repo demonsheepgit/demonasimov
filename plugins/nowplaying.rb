@@ -30,8 +30,6 @@ EOF
 
   set :required_options, [:mplayer, :url]
 
-  @dj_state = false
-  @dj_tweeting = false
 
   # How long to wait after noticing a change to announce it
   ANNOUNCE_DELAY = 8 # seconds
@@ -39,10 +37,28 @@ EOF
   LOOP_INTERVAL = 5 # seconds
 
   match /dj (on|off)\s*$/,          :method => :set_dj_state
-  match /dj twitter (on|off)\s*$/,  :method => :set_djtwitter_state
+  match /dj twitter (on|off)\s*$/,  :method => :set_tweeting_state
   match /dj\s*$|dj status\s*$/,     :method => :show_status
   match /what's playing/,           :method => :whats_playing
   listen_to :connect,               :method => :on_connect
+
+  def initialize(*args)
+    super
+    @show_time_excuses = [
+        'That would be rude.',
+        'I\'ve read The Looming Tower, but I still can\'t do that right now.',
+        'Trump is good for ratings.',
+        'Alger Hiss was a communist spy.',
+        'Can\'t do that, seminar callers are jamming the lines.',
+        'An intern pushed the wrong button.',
+        'If only I had a producer...',
+        'The fetching Mrs. Asimov and I saw a great movie last night.'
+    ]
+
+    @dj_state = false
+    @dj_tweeting = false
+
+  end
 
   # Do some setup work when we first connect
   def on_connect(*)
@@ -55,28 +71,47 @@ EOF
     end
   end
 
-  def set_dj_state(msg, option)
-    option = option == 'on' ? true : false
+  def set_dj_state(msg, state)
 
-    if @dj_state == option
+    state = state == 'on' ? true : false
+
+    # don't re-apply current state
+    if @dj_state == state
       msg.reply "DJ announcements already #{@dj_state ? 'enabled' : 'disabled'}"
       return
     end
 
-    @dj_state = option == true
-    msg.reply "DJ announcements are now #{@dj_state ? 'enabled' : 'disabled'}"
-    start_announcements(msg) if @dj_state
+    if is_hh_show_time?
+      msg.reply @show_time_excuses.sample
+      return
+    else
+      state ? toggle_dj_on(msg) : toggle_dj_off(msg)
+    end
+
   end
 
-  def set_djtwitter_state(msg, option)
+  def toggle_dj_on(msg)
+    msg.reply 'DJ announcements enabled'
+    @dj_state = true
+    # turn on tweeting by default
+    @dj_tweeting = true
+    start_announcements(msg)
+  end
 
-    option = option == 'on' ? true : false
+  def toggle_dj_off(msg)
+    msg.reply 'DJ announcements disabled'
+    @dj_state = false
+  end
+
+  def set_tweeting_state(msg, state)
+
+    state = state == 'on' ? true : false
 
     unless @dj_state
       msg.reply "Enable the DJ first with '#{bot.name} dj on'"
     else
-      @dj_tweeting = option == true
-      msg.reply "DJ tweets are now #{@dj_tweeting ? 'enabled' : 'disabled'}: https://twitter.com/demonasimov"
+      @dj_tweeting = state == true
+      msg.reply "DJ tweets #{@dj_tweeting ? 'enabled' : 'disabled'}: https://twitter.com/demonasimov"
     end
   end
 
@@ -89,12 +124,15 @@ EOF
     end
 
     msg.reply response
-
   end
 
   def whats_playing(msg)
-    stream_title = get_stream_title()
-    msg.reply "#{stream_title}"
+    if is_hh_show_time?
+      msg.reply "It's Hugh Hewitt's turn at the mic"
+    else
+      stream_title = get_stream_title()
+      msg.reply "#{stream_title}"
+    end
   end
 
   # The "main" loop runs in this function for as long as
@@ -110,14 +148,16 @@ EOF
     # There's probably a better way than this goofy loop to do this
     while @dj_state
       stream_title = get_stream_title()
+
+      # In some cases (Ubuntu), mplayer can return a nil title
       if stream_title != prev_stream_title && stream_title != nil
         # delay a little before making the announcement
         # otherwise we get ahead of the music since we
         # can see the title change before the music actually
         # changes
         sleep(ANNOUNCE_DELAY)
-        msg.reply "Now playing: #{stream_title}"
 
+        msg.reply "Now playing: #{stream_title}"
         tweet(stream_title)
 
         prev_stream_title = stream_title
@@ -125,7 +165,25 @@ EOF
 
       sleep(LOOP_INTERVAL)
 
+      # If it looks like we're running during normal show time, turn off automagically
+      if is_hh_show_time?
+        msg.reply "It's Hugh's turn now. Bet you wish he had an off button like I do."
+        toggle_dj_off(msg)
+      end
+
     end
+  end
+
+  # Is this a time when the HH show is on the air?
+  def is_hh_show_time?
+    # Monday through Friday
+    if (1..5).to_a.include?(DateTime.now().wday)
+      # 17:00-20:00 (Central Time)
+      if (17..20).to_a.include?(DateTime.now().hour)
+        return true
+      end
+    end
+    false
   end
 
   # Tweet out the title
