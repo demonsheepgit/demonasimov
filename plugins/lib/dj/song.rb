@@ -23,6 +23,8 @@ class Song
     s = "#{title} by #{artist}"
     s << " on #{album}" if album
     s << " (Remarks: #{remarks})" if remarks
+    # stupid ustream barfs at tinyurl
+    # s << " #{short_url}" if short_url
     s
   end
 
