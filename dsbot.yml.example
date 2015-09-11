@@ -31,3 +31,16 @@ nowplaying:
   # the stream URL where the title can be obtained
   url: http://3143.live.streamtheworld.com:80/HUGHIRAAC_SC
 
+dfm_catalog:
+  host: <mysql_host>
+  port: 3306
+  database: <mysql_db>
+  username: <mysql_username>
+  password: <mysql_password>
+
+amazon:
+  aws_access_key_id: <amazon_key>
+  aws_secret_access_key: <amazon_secret>
+
+rhapsody:
+  api_key: <rhapsody_api_key>

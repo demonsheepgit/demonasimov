@@ -34,7 +34,12 @@ bot = Cinch::Bot.new do
         :twitter_consumer_key => config['twitter']['consumer_key'],
         :twitter_consumer_secret => config['twitter']['consumer_secret'],
         :twitter_access_token => config['twitter']['access_token'],
-        :twitter_access_token_secret=> config['twitter']['access_token_secret']
+        :twitter_access_token_secret=> config['twitter']['access_token_secret'],
+        :mysql_host => config['dfm_catalog']['host'],
+        :mysql_port => config['dfm_catalog']['port'],
+        :mysql_username => config['dfm_catalog']['username'],
+        :mysql_password => config['dfm_catalog']['password'],
+        :mysql_database => config['dfm_catalog']['database']
     }
 
     param.plugins.plugins = [Cinch::NowPlaying, Cinch::Plugins::Fortune]

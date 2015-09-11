@@ -17,6 +17,7 @@
 #   url of the mp3 stream
 
 require 'twitter'
+require 'sequel'
 
 class Cinch::NowPlaying
   include Cinch::Plugin
@@ -57,6 +58,16 @@ EOF
 
     @dj_state = false
     @dj_tweeting = false
+
+    mysql_connect_string = "#{config[:mysql_username]}:#{config[:mysql_password]}@"
+    mysql_connect_string << "#{config[:mysql_host]}:#{config[:mysql_port]}/"
+    mysql_connect_string << "#{config[:mysql_database]}"
+
+    @db = Sequel.connect(
+      "mysql://#{mysql_connect_string}",
+      connect_timeout: 10,
+      read_timeout: 3,
+    )
 
   end
 
@@ -128,10 +139,9 @@ EOF
 
   def whats_playing(msg)
     if is_hh_show_time?
-      msg.reply "It's Hugh Hewitt's turn at the mic"
+      msg.reply 'It\'s Hugh Hewitt\'s turn at the mic'
     else
-      stream_title = get_stream_title()
-      msg.reply "#{stream_title}"
+      msg.reply expand_stream_title(get_stream_title())
     end
   end
 
@@ -157,7 +167,7 @@ EOF
         # changes
         sleep(ANNOUNCE_DELAY)
 
-        msg.reply "Now playing: #{stream_title}"
+        msg.reply "Now playing: #{expand_stream_title(stream_title)}"
         tweet(stream_title)
 
         prev_stream_title = stream_title
@@ -201,6 +211,30 @@ EOF
     end
   end
 
+  # include additional information about the title
+  def expand_stream_title(stream_title)
+
+    return nil if stream_title.nil?
+
+    metadata = get_metadata(stream_title)
+    reply = stream_title
+
+    unless metadata.nil?
+      reply << " (#{metadata[:ALBUM]}" unless metadata[:ALBUM].nil?
+      reply << ", #{metadata[:ALBUMYEAR]}" unless metadata[:ALBUMYEAR].nil?
+
+      unless metadata[:BUYCD].nil?
+        buy_url = shorten_url(metadata[:BUYCD]) || ''
+        buy_url = nil if buy_url.empty?
+      end
+      reply << " - #{buy_url}" unless buy_url.nil?
+      reply << ')'
+
+    end
+
+    return reply
+  end
+
   # Fetch the stream title
   def get_stream_title
     stream_title = nil
@@ -212,6 +246,41 @@ EOF
       end
     end
     return stream_title
+  end
+
+  def get_metadata(stream_title)
+    stream_title.strip!
+    stream_data = stream_title.split(' - ', 2)
+    artist = stream_data[0].tr('\'', '')
+    title = stream_data[1].tr('\'', '')
+
+    begin
+      ds = @db[:SONGLIST].where('artist LIKE ? and title LIKE ?', artist, title)
+      if ds.count == 1
+        result = ds.first
+        return result
+      end
+    rescue Exception => e
+      puts "DFM Catalog query failed: #{e.message}"
+      return nil
+    end
+
+    return nil
+
+  end
+
+  def shorten_url(url)
+
+    begin
+      short_url = open("http://duanefm.com/l/shorten.php?longurl=#{URI.escape(url)}").read
+      short_url == 'Error' ? url : short_url
+    rescue OpenURI::HTTPError => e
+      puts 'Error handling URL: ' + url
+      puts e.message
+      return nil
+    end
+
+    return short_url
   end
 
 end
