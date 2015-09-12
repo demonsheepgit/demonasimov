@@ -18,6 +18,8 @@
 
 require 'twitter'
 require 'sequel'
+require 'open-uri'
+require 'pp'
 
 class Cinch::NowPlaying
   include Cinch::Plugin
@@ -153,7 +155,7 @@ EOF
     stream_title = get_stream_title()
     prev_stream_title = stream_title
 
-    msg.reply "Here's what's playing on DuaneFM: #{stream_title}"
+    msg.reply "Here's what's playing on DuaneFM: #{expand_stream_title(stream_title)}"
 
     # There's probably a better way than this goofy loop to do this
     while @dj_state
@@ -249,8 +251,8 @@ EOF
   end
 
   def get_metadata(stream_title)
-    stream_title.strip!
-    stream_data = stream_title.split(' - ', 2)
+
+    stream_data = stream_title.strip.split(' - ', 2)
     artist = stream_data[0].tr('\'', '')
     title = stream_data[1].tr('\'', '')
 
