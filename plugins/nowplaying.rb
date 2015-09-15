@@ -59,7 +59,9 @@ EOF
     ]
 
     @dj_state = false
-    @dj_tweeting = false
+    # Tweets will be on by default, but can be turned off
+    # Note that tweets are only active when dj_state is active
+    @dj_tweeting = true
 
     mysql_connect_string = "#{config[:mysql_username]}:#{config[:mysql_password]}@"
     mysql_connect_string << "#{config[:mysql_host]}:#{config[:mysql_port]}/"
@@ -107,7 +109,6 @@ EOF
     msg.reply 'DJ announcements enabled'
     @dj_state = true
     # turn on tweeting by default
-    @dj_tweeting = true
     start_announcements(msg)
   end
 
@@ -213,13 +214,26 @@ EOF
     end
   end
 
+  # Fetch the stream title
+  def get_stream_title
+    stream_title = nil
+    Open3.popen3(@mplayer_cmd) do |stdin, stdout, stderr, wait_thr|
+      while line = stdout.gets
+        if line.match('ICY Info:')
+          stream_title = line.split('=')[1].tr("';",'')
+        end
+      end
+    end
+    return stream_title
+  end
+
   # include additional information about the title
   def expand_stream_title(stream_title)
 
     return nil if stream_title.nil?
 
     metadata = get_metadata(stream_title)
-    reply = stream_title
+    reply = String.new(stream_title).strip
 
     unless metadata.nil?
       reply << " (#{metadata[:ALBUM]}" unless metadata[:ALBUM].nil?
@@ -237,22 +251,9 @@ EOF
     return reply
   end
 
-  # Fetch the stream title
-  def get_stream_title
-    stream_title = nil
-    Open3.popen3(@mplayer_cmd) do |stdin, stdout, stderr, wait_thr|
-      while line = stdout.gets
-        if line.match('ICY Info:')
-          stream_title = line.split('=')[1].tr("';",'')
-        end
-      end
-    end
-    return stream_title
-  end
-
   def get_metadata(stream_title)
 
-    stream_data = stream_title.strip.split(' - ', 2)
+    stream_data = stream_title.split(' - ', 2)
     artist = stream_data[0].tr('\'', '')
     title = stream_data[1].tr('\'', '')
 
