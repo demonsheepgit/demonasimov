@@ -254,8 +254,8 @@ EOF
   def get_metadata(stream_title)
 
     stream_data = stream_title.split(' - ', 2)
-    artist = stream_data[0].tr('\'', '')
-    title = stream_data[1].tr('\'', '')
+    artist = stream_data[0]
+    title = stream_data[1]
 
     begin
       ds = @db[:SONGLIST].where('artist LIKE ? and title LIKE ?', artist, title)
