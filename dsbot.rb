@@ -6,6 +6,7 @@ require 'yaml'
 
 # Plugins
 require 'cinch/plugins/fortune'
+require_relative 'plugins/dj'
 require_relative 'plugins/nowplaying'
 
 Cinch::Plugins::Fortune.configure do |config|
@@ -41,8 +42,14 @@ bot = Cinch::Bot.new do
         :mysql_password => config['dfm_catalog']['password'],
         :mysql_database => config['dfm_catalog']['database']
     }
+    param.plugins.options[Cinch::DJ] = {
+        :aws_access_key_id => config['amazon']['aws_access_key_id'],
+        :aws_secret_access_key => config['amazon']['aws_secret_access_key'],
+        :spotify_client_id => config['spotify']['client_id'],
+        :spotify_client_secret => config['spotify']['client_secret']
+    }
 
-    param.plugins.plugins = [Cinch::NowPlaying, Cinch::Plugins::Fortune]
+    param.plugins.plugins = [Cinch::DJ, Cinch::NowPlaying, Cinch::Plugins::Fortune]
   end
 
   on :channel, /!bye$/ do |m|
@@ -52,7 +59,5 @@ bot = Cinch::Bot.new do
   end
 
 end
-
-
 
 bot.start
