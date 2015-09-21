@@ -6,7 +6,7 @@ require_relative 'lib/dj/url_handlers'
 
 
 # Accept and remember DFM all request show requests
-class Cinch::Plugin::DJ
+class Cinch::DJ
   include Cinch::Plugin
 
   set :prefix, /^dj\s+/
@@ -214,7 +214,7 @@ EOF
     subject.strip!
 
     unless subject.empty? || is_admin?(msg.user)
-      _private_reply(msg.user, 'Only admins may clear requests for other users')
+      _private_reply(msg, 'Only admins may clear requests for other users')
       return
     end
 
