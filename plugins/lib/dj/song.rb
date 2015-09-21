@@ -18,13 +18,11 @@ class Song
   attr_accessor :filename
   attr_accessor :error
 
-
   def to_s
     s = "#{title} by #{artist}"
     s << " on #{album}" if album
     s << " (Remarks: #{remarks})" if remarks
-    # stupid ustream barfs at tinyurl
-    # s << " #{short_url}" if short_url
+    s << " #{short_url}" if short_url
     s
   end
 
@@ -120,7 +118,7 @@ class Song
     return @short_url unless @short_url.nil?
 
     begin
-      short_url = open("http://tinyurl.com/api-create.php?url=#{URI.escape(url)}").read
+      short_url = open("http://duanefm.com/l/shorten.php?longurl=#{URI.escape(url)}").read
       short_url == 'Error' ? url : short_url
     rescue OpenURI::HTTPError
       url
