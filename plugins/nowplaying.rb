@@ -21,7 +21,7 @@ require 'sequel'
 require 'open-uri'
 require 'pp'
 
-class Cinch::NowPlaying
+class Cinch::Plugins::NowPlaying
   include Cinch::Plugin
 
   set :help, <<-EOF
@@ -50,12 +50,8 @@ EOF
     @show_time_excuses = [
         'That would be rude.',
         'I\'ve read The Looming Tower, but I still can\'t do that right now.',
-        'Trump is good for ratings.',
-        'Alger Hiss was a communist spy.',
         'Can\'t do that, seminar callers are jamming the lines.',
-        'An intern pushed the wrong button.',
-        'If only I had a producer...',
-        'The fetching Mrs. Asimov and I saw a great movie last night.'
+        'Hugh is still talking.'
     ]
 
     @dj_state = false

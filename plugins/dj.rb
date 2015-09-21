@@ -6,7 +6,7 @@ require_relative 'lib/dj/url_handlers'
 
 
 # Accept and remember DFM all request show requests
-class Cinch::DJ
+class Cinch::Plugins::DJ
   include Cinch::Plugin
 
   set :prefix, /^dj\s+/

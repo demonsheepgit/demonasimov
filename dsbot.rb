@@ -6,8 +6,10 @@ require 'yaml'
 
 # Plugins
 require 'cinch/plugins/fortune'
+require 'cinch/plugins/identify'
 require_relative 'plugins/dj'
 require_relative 'plugins/nowplaying'
+require_relative 'plugins/ustream'
 
 Cinch::Plugins::Fortune.configure do |config|
   config.max_length=160
@@ -29,7 +31,7 @@ bot = Cinch::Bot.new do
 
     # Plugin options
     param.plugins.prefix = lambda{|msg| Regexp.compile("^#{Regexp.escape(msg.bot.nick)}:?\s*")}
-    param.plugins.options[Cinch::NowPlaying] = {
+    param.plugins.options[Cinch::Plugins::NowPlaying] = {
         :url => config['nowplaying']['url'],
         :mplayer => config['nowplaying']['mplayer'],
         :twitter_consumer_key => config['twitter']['consumer_key'],
@@ -42,14 +44,26 @@ bot = Cinch::Bot.new do
         :mysql_password => config['dfm_catalog']['password'],
         :mysql_database => config['dfm_catalog']['database']
     }
-    param.plugins.options[Cinch::DJ] = {
+    param.plugins.options[Cinch::Plugins::DJ] = {
         :aws_access_key_id => config['amazon']['aws_access_key_id'],
         :aws_secret_access_key => config['amazon']['aws_secret_access_key'],
         :spotify_client_id => config['spotify']['client_id'],
         :spotify_client_secret => config['spotify']['client_secret']
     }
+    param.plugins.options[Cinch::Plugins::Identify] = {
+        :username => config['irc']['user'],
+        :password => config['irc']['password'],
+        :type => :nickserv
 
-    param.plugins.plugins = [Cinch::DJ, Cinch::NowPlaying, Cinch::Plugins::Fortune]
+    }
+
+    param.plugins.plugins = [
+        Cinch::Plugins::DJ,
+        Cinch::Plugins::Fortune,
+        Cinch::Plugins::Identify,
+        Cinch::Plugins::NowPlaying,
+        Cinch::Plugins::UStream
+    ]
   end
 
   on :channel, /!bye$/ do |m|
