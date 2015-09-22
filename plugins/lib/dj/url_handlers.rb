@@ -1,11 +1,12 @@
 require 'vacuum' # amazon
 require 'rspotify' #spotify
+require 'open-uri'
 
 class Url_handlers
 
   def initialize(config)
     @config = config
-
+    @max_requests = config[:max_requests]
   end
 
   # TODO additional error handling
@@ -42,9 +43,8 @@ class Url_handlers
         raise resp_hash['ItemLookupResponse']['Items']['Request']['Errors']['Error']['Message']
       end
     rescue Exception => e
-      puts("Amazon request failed: #{e.message}. URL was: #{url}")
-      song.error = Exception.new('Amazon could not be reached, or the URL provided was malformed.')
-      return song
+      # TODO: log this error somewhere
+      raise("Amazon request failed: #{e.message}. URL was: #{url}")
     end
 
     item = resp_hash['ItemLookupResponse']['Items']['Item']
@@ -54,10 +54,9 @@ class Url_handlers
     song.album  = item['RelatedItems']['RelatedItem']['Item']['ItemAttributes']['Title']
     song.url    = item['DetailPageURL']
 
-    return song
+    return Array(song)
 
   end
-
 
   # TODO additional error handling
   # @param [String] url Spotify URL of the specific song
@@ -66,31 +65,72 @@ class Url_handlers
   #   nil otherwise
   def process_spotify_url(url)
 
-    song = Song.new
-
     # https://play.spotify.com/track/68y4C6DGkdX0C9DjRbKB2g
-    itemid = URI(url).path.split('/')[2]
+    # http://open.spotify.com/user/conservativela/playlist/7fl70xvClWq2K1rYyK8wyI
+
+    query_type = URI(url).path.split('/')[-2]
+    itemid = URI(url).path.split('/')[-1]
+
+    # itemid = URI(url).path.split('/')[2]
+
+    case query_type
+      when 'track'
+        song = _spotify_track(itemid)
+        song.url = url
+        return Array(song)
+      when 'playlist'
+        user = URI(url).path.split('/')[-3]
+        songs = _spotify_playlist(user, itemid)
+        return songs
+      else
+        raise(ArgumentError, "Invalid or unknown query type #{query_type}")
+    end
+
+  end
+
+  def _spotify_playlist(user, itemid)
+
+    RSpotify.authenticate(@config[:spotify_client_id], @config[:spotify_client_secret])
+    playlist = RSpotify::Playlist.find(user, itemid)
+    puts "size: #{playlist.tracks.size}"
+    if playlist.tracks.size > @max_requests
+      raise(ArgumentError, 'Playlist contains too many tracks')
+    end
+
+    songs = Array.new
+
+    playlist.tracks.each do |track|
+      song = Song.new
+      song.artist = track.artists[0].name
+      song.title = track.name
+      song.album = track.album.name
+      song.url = track.external_urls['spotify']
+      songs << song
+    end
+
+    return songs
+  end
+
+  def _spotify_track(itemid)
+    song = Song.new
 
     begin
       track = RSpotify::Track.find(itemid)
     rescue Exception => e
-      puts("Spotify request failed: #{e.message}. URL was: #{url}")
-      song.error = e
-      return song
+      # TODO: log this error somewhere
+      raise("Spotify request failed: #{e.message}. URL was: #{url}")
     end
 
     if track.nil?
-      song.error = Exception.new('Spotify could not be reached, or the URL provided was malformed.')
-      return song
+      # TODO: log this error somewhere
+      raise('Spotify could not be reached, or the URL provided was malformed.')
     end
 
     song.artist = track.artists[0].name
     song.title = track.name
     song.album = track.album.name
-    song.url = url
 
     song
-
   end
 
   # TODO Handle Rhapsody URLs

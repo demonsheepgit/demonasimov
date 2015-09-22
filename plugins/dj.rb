@@ -32,7 +32,7 @@ class Cinch::Plugins::DJ
     # TODO: make this dynamically settable at runtime
     @admins = %w(demonsheep)
     # A single user cannot have more than max_requests
-    @max_requests = 5
+    @max_requests = config[:max_requests]
 
     @url_handler = Url_handlers.new(config)
 
@@ -81,29 +81,37 @@ EOF
     end
 
     # attempt to resolve the url to a product
-    case URI(url).host
-      when /amazon.com$/
-        song = @url_handler.process_amazon_url(url)
-      when /spotify.com$/
-        song = @url_handler.process_spotify_url(url)
-      # TODO support rhapsody
-      # when /rhapsody.com$/
-      #   song = process_rhapsody_url(url)
+    begin
+      case URI(url).host
+        when /amazon.com$/
+          songs = @url_handler.process_amazon_url(url)
+        when /spotify.com$/
+          songs = @url_handler.process_spotify_url(url)
+        # TODO support rhapsody
+        # when /rhapsody.com$/
+        #   song = process_rhapsody_url(url)
 
-      else
-        # TODO support cloud storage
-        # this one will be harder and will
-        # require us to download the mp3 file
-        # TODO make this count against the max_requests
-        # so that a user can't send the same download request
-        # a bunch of times.
-        _address_reply(msg, "Don't know how to process URLs for #{URI(url).host}")
-        return
+        else
+          # TODO support cloud storage
+          # this one will be harder and will
+          # require us to download the mp3 file
+          # TODO make this count against the max_requests
+          # so that a user can't send the same download request
+          # a bunch of times.
+          _address_reply(msg, "Don't know how to process URLs for #{URI(url).host}")
+          return
+      end
+    rescue Exception => e
+      _address_reply(msg, "Encountered a problem - #{e.message}")
+      return
     end
 
-    if song.error.is_a?(Exception)
-      _address_reply(msg, "There was a problem: #{song.error.message}")
-    else
+    if songs.size + @requests.count(msg.user.nick) > @max_requests
+      _address_reply(msg, "Adding #{songs.size} would exceed the limit of #{@max_requests} songs")
+      return
+    end
+
+    songs.each do |song|
       song_id = nil
       synchronize(:request_sync) do
         song_id = @requests.add(msg.user.nick, song)
@@ -111,7 +119,6 @@ EOF
 
       _address_reply(msg, "Added request: ##{song_id}: #{song.to_s}")
     end
-
   end
 
   def add_request_by_name(msg,subject)
@@ -292,7 +299,7 @@ EOF
     end
 
     if action == :add && @requests.count(nick) >= @max_requests
-      return "A maximum of #{@max_requests} requests are allowed."
+      return "A maximum of #{@max_requests} requests are allowed, you have #{@requests.count(nick)}."
     end
 
     nil

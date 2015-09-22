@@ -48,7 +48,8 @@ bot = Cinch::Bot.new do
         :aws_access_key_id => config['amazon']['aws_access_key_id'],
         :aws_secret_access_key => config['amazon']['aws_secret_access_key'],
         :spotify_client_id => config['spotify']['client_id'],
-        :spotify_client_secret => config['spotify']['client_secret']
+        :spotify_client_secret => config['spotify']['client_secret'],
+        :max_requests => 5
     }
     param.plugins.options[Cinch::Plugins::Identify] = {
         :username => config['irc']['user'],
