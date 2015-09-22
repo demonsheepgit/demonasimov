@@ -42,5 +42,6 @@ amazon:
   aws_access_key_id: <amazon_key>
   aws_secret_access_key: <amazon_secret>
 
-rhapsody:
-  api_key: <rhapsody_api_key>
+spotify:
+  client_id: <client_id>
+  client_secret: <client_secret>
