@@ -133,13 +133,4 @@ class Url_handlers
     song
   end
 
-  # TODO Handle Rhapsody URLs
-  # @param [String] url Rhapsody URL of the specific song
-  #
-  # @return [Song] populated if request is valid
-  #   nil otherwise
-  def self.process_rhapsody_url(url)
-
-  end
-
 end

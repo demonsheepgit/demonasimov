@@ -87,10 +87,6 @@ EOF
           songs = @url_handler.process_amazon_url(url)
         when /spotify.com$/
           songs = @url_handler.process_spotify_url(url)
-        # TODO support rhapsody
-        # when /rhapsody.com$/
-        #   song = process_rhapsody_url(url)
-
         else
           # TODO support cloud storage
           # this one will be harder and will
