@@ -59,6 +59,7 @@ EOF
 The following URLs/sites are supported:
 * Amazon  - example URL: http://www.amazon.com/dp/B00Q804ADY
 * Spotify - example URL: http://play.spotify.com/track/68y4C6DGkdX0C9DjRbKB2g
+* Spotify playlist - example URL: https://open.spotify.com/user/demonsheep/playlist/abc13sdy3ddd6hg
 EOF
     _private_reply(msg, help_content)
   end
@@ -112,6 +113,9 @@ EOF
         when /youtube.com$/
           # youtube = YoutubeSong.new(config, url)
           # songs = youtube.process
+          # this will require special handling where the user will need to
+          # supply the title/artist of the song so that we can write it into the ID3
+          # data
         else
           # TODO support cloud storage
           # this one will be harder and will
@@ -157,6 +161,9 @@ EOF
     end
   end
 
+  # Add a single song to the request user's request list
+  # @param [Cinch::Message] msg
+  # @param [Song] song
   def _add_request(msg, song)
 
     unless _request_allowed(msg.user.nick, :add).nil?
@@ -172,8 +179,7 @@ EOF
     _address_reply(msg, "Added request: ##{song_id}: #{song.to_s}")
   end
 
-
-  # Allow attempting to add multiple songs at once, ie from a playlist
+  # Add multiple songs at once, ie from a playlist
   # @param [Cinch::Message] msg
   # @param [Array] songs
   def _add_requests(msg, songs)

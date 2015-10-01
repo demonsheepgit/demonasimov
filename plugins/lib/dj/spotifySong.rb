@@ -35,10 +35,10 @@ class SpotifySong < Song
   def process(o)
 
     unless o.is_a?(RSpotify::Track)
-      # Handle as a URL
+      # Handle a URL
       url = o
       # https://play.spotify.com/track/68y4C6DGkdX0C9DjRbKB2g
-      itemid = URI(url).path.split('/')[2]
+      itemid = URI(url).path.split('/')[-1]
 
       begin
         track = RSpotify::Track.find(itemid)

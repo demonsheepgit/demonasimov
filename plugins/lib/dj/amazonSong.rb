@@ -7,12 +7,14 @@ class AmazonSong < Song
 
   attr_reader :asin
 
+  # Example URLs:
   # http://www.amazon.com/dp/B000SXKPYU/ref=dm_ws_tlw_trk1
+  # http://www.amazon.com/gp/product/B007T2XCIY/
   def initialize(
       properties = {}
   )
     super
-    @asin   = properties['asin']
+    @id   = properties['id']
   end
 
   def auth(key, secret)
@@ -24,7 +26,7 @@ class AmazonSong < Song
 
   def process(url)
 
-    amazon = Vacuum.new
+    amazon = Vacuum::Request.new
 
     amazon.configure(
         aws_access_key_id: @auth[:key],
@@ -32,7 +34,8 @@ class AmazonSong < Song
         associate_tag: 'tag'
     )
 
-    itemid = URI(url).path.split('/')[2]
+    itemid = _itemid(url)
+
     resp_hash = Hash.new
 
     begin
@@ -56,7 +59,7 @@ class AmazonSong < Song
 
     item = resp_hash['ItemLookupResponse']['Items']['Item']
 
-    @asin   = item['ASIN']
+    @id = item['ASIN']
 
     self.title  = item['ItemAttributes']['Title']
     self.artist = item['ItemAttributes']['Creator']['__content__']
@@ -70,7 +73,7 @@ class AmazonSong < Song
   def to_h
     super.merge(
     {
-        :asin => @asin
+        :id => @id
     })
   end
 
@@ -86,6 +89,29 @@ class AmazonSong < Song
         o[0]['data']
 
     )
+  end
+
+  private
+
+  # @param [URI] url
+  def _itemid(url)
+    item_id = nil
+    parts = URI(url).path.split('/')
+    parts.each_with_index do |url_part, i|
+      case url_part
+        when 'dp'
+          item_id = parts[i+1] || nil
+          return item_id
+        when 'product'
+          item_id = parts[i+1] || nil
+          return item_id
+        else
+          # do nothing
+      end
+
+    end
+
+    item_id
   end
 
 end
