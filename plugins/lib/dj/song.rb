@@ -52,8 +52,8 @@ class Song
   end
 
   def to_s
-    s = "#{title} by #{artist}"
-    s << " on #{album}" if album
+    s = "#{title} by: #{artist}"
+    s << " (on: #{album})" if album
     s << " (Remarks: #{remarks})" if remarks
     s << " #{short_url}" if short_url
     s
