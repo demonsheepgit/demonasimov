@@ -2,7 +2,6 @@ require 'uri'
 require 'open-uri'
 require 'pp'
 require_relative 'lib/dj/requests'
-require_relative 'lib/dj/url_handlers'
 
 # Accept and remember DFM all request show requests
 class Cinch::Plugins::DJ
@@ -33,8 +32,6 @@ class Cinch::Plugins::DJ
     @admins = %w(demonsheep)
     # A single user cannot have more than max_requests
     @max_requests = config[:max_requests]
-    @url_handler = Url_handlers.new(config)
-
   end
 
   def on_connect(*)
