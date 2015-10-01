@@ -1,6 +1,8 @@
 require 'open-uri'
+require_relative '../logging'
 
 class Song
+  include Logging
 
   MAX_STR_LENGTH = 64
   MAX_URL_LENGTH = 256
@@ -8,44 +10,24 @@ class Song
   ONE_MB = 1048576 # 1MB
   MAX_FILESIZE = 15728640 # 15MB
 
-
   attr_reader :title
   attr_reader :artist
   attr_reader :album
   attr_reader :remarks
   attr_reader :url
   attr_reader :short_url
-  attr_accessor :filename
-  attr_accessor :error
-
-  def to_s
-    s = "#{title} by #{artist}"
-    s << " on #{album}" if album
-    s << " (Remarks: #{remarks})" if remarks
-    s << " #{short_url}" if short_url
-    s
-  end
 
   def initialize(
-      title     = nil,
-      artist    = nil,
-      album     = nil,
-      remarks   = nil,
-      url       = nil,
-      short_url = nil,
-      filename  = nil
+    properties = {}
   )
 
-    @title      = title
-    @artist     = artist
-    @album      = album
-    @remarks    = remarks
-    @url        = url
-    @short_url  = short_url
-    @filename   = filename
+    @title      = properties['title'] || nil
+    @artist     = properties['artist'] || nil
+    @album      = properties['album'] || nil
+    @remarks    = properties['remarks'] || nil
+    @url        = properties['url'] || nil
+    @short_url  = properties['short_url'] || nil
 
-    @state = nil
-    @thread = nil
   end
 
   def title=(value)
@@ -69,30 +51,37 @@ class Song
     @remarks = value.nil? ? nil : value.slice(0..MAX_REMARKS_LENGTH)
   end
 
+  def to_s
+    s = "#{title} by #{artist}"
+    s << " on #{album}" if album
+    s << " (Remarks: #{remarks})" if remarks
+    s << " #{short_url}" if short_url
+    s
+  end
+
+  def to_h
+    {
+        :title      => title,
+        :artist     => artist,
+        :album      => album,
+        :remarks    => remarks,
+        :url        => url,
+        :short_url  => short_url,
+    }
+  end
+
   def to_json(*a)
     {
         :json_class => self.class.name,
-        :data => {
-            :title      => title,
-            :artist     => artist,
-            :album      => album,
-            :remarks    => remarks,
-            :url        => url,
-            :short_url  => short_url,
-            :filename   => filename
-        }
+        :data => self.to_h
     }.to_json(*a)
   end
 
   def self.json_create(*o)
+    logger.debug("#{self.class.name}::#{__method__}")
+    logger.debug pp(o)
     new(
-       o[0]['data']['title'],
-       o[0]['data']['artist'],
-       o[0]['data']['album'],
-       o[0]['data']['remarks'],
-       o[0]['data']['url'],
-       o[0]['data']['short_url'],
-       o[0]['data']['filename']
+       o[0]['data']
     )
   end
 

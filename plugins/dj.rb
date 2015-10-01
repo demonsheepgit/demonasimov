@@ -4,7 +4,6 @@ require 'pp'
 require_relative 'lib/dj/requests'
 require_relative 'lib/dj/url_handlers'
 
-
 # Accept and remember DFM all request show requests
 class Cinch::Plugins::DJ
   include Cinch::Plugin
@@ -18,7 +17,8 @@ class Cinch::Plugins::DJ
   match /list requests\s*$/,                        :method => :list_requests
   match /count requests\s*$/,                       :method => :count_requests
   match /drop request\s+(\d)\s*$/,                  :method => :drop_request
-  match /clear(\s*.*)\s*$/,                         :method => :clear_requests
+  match /clear requests\s*$/,                       :method => :clear_requests
+  match /clear requests for (.*)\s*$/,              :method => :clear_requests
   match /set (title|artist|album)\s+(\d)\s+(.*)/,   :method => :set_song_param
   match /set (remarks|url)\s+(\d)\s+(.*)/,          :method => :set_song_param
   match /email requests\s*$/,                       :method => :email_requests
@@ -33,7 +33,6 @@ class Cinch::Plugins::DJ
     @admins = %w(demonsheep)
     # A single user cannot have more than max_requests
     @max_requests = config[:max_requests]
-
     @url_handler = Url_handlers.new(config)
 
   end
@@ -70,6 +69,8 @@ EOF
   # Allow a user to create a new request by giving a url
   def add_request_by_url(msg, url)
 
+    song = nil
+
     unless _request_allowed(msg.user.nick, :add).nil?
       _address_reply(msg, _request_allowed(msg.user.nick, :add))
       return
@@ -84,9 +85,36 @@ EOF
     begin
       case URI(url).host
         when /amazon.com$/
-          songs = @url_handler.process_amazon_url(url)
+          song = AmazonSong.new
+          song.auth(config[:aws_access_key_id], config[:aws_secret_access_key])
+          # wrap song.process in a thread?
+          # that should allow us to watch/notify the user when we're done
+          # delays may come from outgoing calls, unavailable services, etc
+          #
+          # We can allow multiple waiting requests per user - ie multiple youtube URLs
+          # but we'll have to be careful not to allow the user to somehow exceed their limit
+          # This will primarily manifest itself when processing multi-song requests, such as a
+          # playlist.
+          #
+          # We need to handle a timeout from a request, and handle a user canceling/dropping the
+          # request before it finished processing.
+          song.process(url)
         when /spotify.com$/
-          songs = @url_handler.process_spotify_url(url)
+          query_type = URI(url).path.split('/')[-2]
+
+          case query_type
+            when 'track'
+              song = SpotifySong.new
+              song.auth(config[:spotify_client_id], config[:spotify_client_secret])
+              song.process(url)
+            when 'playlist'
+              playlist = SpotifyPlaylist.new
+              playlist.auth(config[:spotify_client_id], config[:spotify_client_secret])
+              songs = playlist.process(url)
+          end
+        when /youtube.com$/
+          # youtube = YoutubeSong.new(config, url)
+          # songs = youtube.process
         else
           # TODO support cloud storage
           # this one will be harder and will
@@ -99,30 +127,17 @@ EOF
       end
     rescue Exception => e
       _address_reply(msg, "Encountered a problem - #{e.message}")
+      puts e.message
+      puts e.backtrace
       return
     end
 
-    if songs.size + @requests.count(msg.user.nick) > @max_requests
-      _address_reply(msg, "Adding #{songs.size} would exceed the limit of #{@max_requests} songs")
-      return
-    end
+    _add_request(msg, song) unless song.nil?
+    _add_requests(msg, songs) unless songs.nil?
 
-    songs.each do |song|
-      song_id = nil
-      synchronize(:request_sync) do
-        song_id = @requests.add(msg.user.nick, song)
-      end
-
-      _address_reply(msg, "Added request: ##{song_id}: #{song.to_s}")
-    end
   end
 
-  def add_request_by_name(msg,subject)
-
-    unless _request_allowed(msg.user.nick, :add).nil?
-      _address_reply(msg, _request_allowed(msg.user.nick, :add))
-      return
-    end
+  def add_request_by_name(msg, subject)
 
     song = Song.new
     tokens = subject.split(/(title|album|artist|remarks):\s*/)
@@ -140,15 +155,50 @@ EOF
     if song.title.nil? || song.artist.nil?
       _address_reply(msg, 'You must supply at least title and artist')
     else
-      song_id = nil
-      synchronize(:request_sync) do
-        song_id = @requests.add(msg.user.nick, song)
-      end
 
-      _address_reply(msg, "Added request ##{song_id}: #{song.to_s}")
+      _add_request(msg, song)
     end
   end
 
+  def _add_request(msg, song)
+
+    unless _request_allowed(msg.user.nick, :add).nil?
+      _address_reply(msg, _request_allowed(msg.user.nick, :add))
+      return
+    end
+
+    song_id = nil
+    synchronize(:request_sync) do
+      song_id = @requests.add(msg.user.nick, song)
+    end
+
+    _address_reply(msg, "Added request: ##{song_id}: #{song.to_s}")
+  end
+
+
+  # Allow attempting to add multiple songs at once, ie from a playlist
+  # @param [Cinch::Message] msg
+  # @param [Array] songs
+  def _add_requests(msg, songs)
+
+    unless _request_allowed(msg.user.nick, :add).nil?
+      _address_reply(msg, _request_allowed(msg.user.nick, :add))
+      return
+    end
+
+    if @requests.count(msg.user.nick) + songs.size > @max_requests
+      _address_reply(msg, "#{songs.size} new requests would exceed your request limit of #{@max_requests} songs.")
+      return
+    end
+
+    songs.each { |song| _add_request(msg, song) }
+
+  end
+
+  # @param [Cinch::Message] msg
+  # @param [String] key
+  # @param [Integer] id
+  # @param [String] val
   def set_song_param(msg, key, id, val)
 
     unless _request_allowed(msg.user.nick, :modify).nil?
@@ -207,7 +257,7 @@ EOF
     _address_reply(msg, "Dropped request ##{id}, #{deleted_title} by #{deleted_artist}")
   end
 
-  def clear_requests(msg, subject)
+  def clear_requests(msg, subject='')
 
     unless _request_allowed(msg.user.nick, :delete).nil?
       _address_reply(msg, _request_allowed(msg.user.nick, :delete))
@@ -256,7 +306,7 @@ EOF
     count = @requests.count(msg.user.nick)
     case count
       when 0
-        _address_reply(msg, 'You have no requests.')
+        _address_reply(msg, "You have no requests for the #{next_show_date} show")
       when 1
         _address_reply(msg, "You have #{count} request for the show that airs #{next_show_date}")
       else
@@ -266,7 +316,7 @@ EOF
   end
 
   def next_show_date
-    "#{@requests.show_date.month}/#{@requests.show_date.mday}."
+    "#{@requests.show_date.month}/#{@requests.show_date.mday}"
   end
 
   # Compose an email to DP listing all the requests
@@ -289,7 +339,7 @@ EOF
 
   def _request_allowed(nick, action)
 
-    # Deadline should always be the first.
+    # Deadline should always be the first reason
     if @requests.past_deadline?
       return 'The request line for this week is closed.'
     end

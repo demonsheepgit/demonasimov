@@ -3,9 +3,14 @@ require 'open-uri'
 require 'pp'
 require 'redis'
 require 'json'
+require_relative '../logging'
 require_relative 'song'
+require_relative 'amazonSong'
+require_relative 'spotifySong'
+require_relative 'spotifyPlaylist'
 
 class Requests
+  include Logging
 
   SATURDAY = 6
   DEADLINE_HOUR = 9
@@ -14,6 +19,8 @@ class Requests
 
   def initialize(*args)
     super
+
+    logger.debug("#{self.class.name}::#{__method__}")
 
     @redis = Redis.new
     @lock = Mutex.new
@@ -24,7 +31,7 @@ class Requests
   end
 
   # @param nick [String] user nick
-  # @param song [SongStruct] the song to be added
+  # @param song [Song] the song to be added
   #
   # @return [int] the int id of the song added
   #   nil otherwise
@@ -63,7 +70,7 @@ class Requests
   # @param nick [String] user nick
   # @param id [int] the request to be modified
   #
-  # @return [SongStruct]
+  # @return [Song]
   def get(nick, id)
     return nil if @requests[nick].nil?
     return nil if @requests[nick][id.to_i].nil?
@@ -76,7 +83,7 @@ class Requests
   # album title, etc
   # @param nick [String] user nick
   # @param id [int] the request to be modified
-  # @param song [SongStruct] the updated song
+  # @param song [Song] the updated song
   #
   # @return void
   def update(nick, id, song)
@@ -126,12 +133,12 @@ class Requests
   #
   # @return [Hash]
   def load_requests(load_show_date)
-    request_data = @redis.get("requests-#{load_show_date}")
-    if request_data.nil?
+    request_json = @redis.get("requests-#{load_show_date}")
+    if request_json.nil?
       {}
     else
 
-      request_data = JSON.parse(request_data, :create_additions => true)
+      request_data = JSON.parse(request_json, :create_additions => true)
 
       # convert the string representations of the request sequence id to an integer
       request_data.keys.each do |nick|
@@ -155,9 +162,7 @@ class Requests
   end
 
   def past_deadline?
-    past_deadline = (Date.today() >= @show_date && Time.now.hour >= DEADLINE_HOUR)
-
-    past_deadline
+    Date.today() >= @show_date && Time.now.hour >= DEADLINE_HOUR
   end
 
   # If necessary, roll @show_date to the next week
