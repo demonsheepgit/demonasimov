@@ -5,8 +5,6 @@ require 'pp'
 class AmazonSong < Song
   include Logging
 
-  attr_reader :asin
-
   # Example URLs:
   # http://www.amazon.com/dp/B000SXKPYU/ref=dm_ws_tlw_trk1
   # http://www.amazon.com/gp/product/B007T2XCIY/
@@ -14,7 +12,7 @@ class AmazonSong < Song
       properties = {}
   )
     super
-    @id   = properties['id']
+
   end
 
   def auth(key, secret)
@@ -26,6 +24,11 @@ class AmazonSong < Song
 
   def process(url)
 
+    self.url = url
+    self.progress = :processing
+
+    # fake a delay to test threads
+    sleep 10
     amazon = Vacuum::Request.new
 
     amazon.configure(
@@ -34,14 +37,12 @@ class AmazonSong < Song
         associate_tag: 'tag'
     )
 
-    itemid = _itemid(url)
-
     resp_hash = Hash.new
 
     begin
       response = amazon.item_lookup(
           query: {
-              :ItemId => itemid,
+              :ItemId => self.itemid,
               :ResponseGroup => %w(RelatedItems Small).join(','),
               :RelationshipType => 'Tracks'
           }
@@ -49,9 +50,11 @@ class AmazonSong < Song
 
       resp_hash = response.to_h
       if resp_hash['ItemLookupResponse']['Items']['Request']['Errors']
+        self.progress = :failed
         raise resp_hash['ItemLookupResponse']['Items']['Request']['Errors']['Error']['Message']
       end
     rescue Exception => e
+      self.progress = :failed
       # TODO: log this error somewhere
       logger.warn("Amazon request failed: #{e.message}.")
       raise("Amazon request failed: #{e.message}.")
@@ -59,21 +62,18 @@ class AmazonSong < Song
 
     item = resp_hash['ItemLookupResponse']['Items']['Item']
 
-    @id = item['ASIN']
-
     self.title  = item['ItemAttributes']['Title']
     self.artist = item['ItemAttributes']['Creator']['__content__']
     self.album  = item['RelatedItems']['RelatedItem']['Item']['ItemAttributes']['Title']
     self.url    = item['DetailPageURL']
 
-    return true
+    self.progress = :complete unless self.progress == :canceled
 
   end
 
   def to_h
     super.merge(
     {
-        :id => @id
     })
   end
 
@@ -91,12 +91,9 @@ class AmazonSong < Song
     )
   end
 
-  private
-
-  # @param [URI] url
-  def _itemid(url)
+  def itemid
     item_id = nil
-    parts = URI(url).path.split('/')
+    parts = URI(self.url).path.split('/')
     parts.each_with_index do |url_part, i|
       case url_part
         when 'dp'

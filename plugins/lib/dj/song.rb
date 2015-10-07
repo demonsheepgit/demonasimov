@@ -16,20 +16,31 @@ class Song
   attr_reader :remarks
   attr_reader :url
   attr_reader :short_url
+  attr_reader :progress
+  attr_reader :complete
 
   def initialize(
     properties = {}
   )
 
+    @progress   = properties['is_new'] === true ? :pending : nil
+
     @title      = properties['title'] || nil
     @artist     = properties['artist'] || nil
     @album      = properties['album'] || nil
     @remarks    = properties['remarks'] || nil
-    @url        = properties['url'] || nil
     @short_url  = properties['short_url'] || nil
+    @complete   = properties['complete']
+    @url        = properties['url'] || nil
+
+    pp properties
+    pp self
+
 
   end
 
+
+  # @param [String] value
   def title=(value)
     @title = value.nil? ? nil : value.slice(0..MAX_STR_LENGTH)
   end
@@ -51,11 +62,25 @@ class Song
     @remarks = value.nil? ? nil : value.slice(0..MAX_REMARKS_LENGTH)
   end
 
+  def complete=(value)
+    @complete = value === true ? true : false
+  end
+
+  def progress=(value)
+    @progress = value.nil? ? nil : value.slice(0..MAX_STR_LENGTH)
+  end
+
   def to_s
-    s = "#{title} by: #{artist}"
-    s << " (on: #{album})" if album
-    s << " (Remarks: #{remarks})" if remarks
-    s << " #{short_url}" if short_url
+    pp self
+    if progress.nil? || progress.to_sym == :complete
+      s = "#{title} by: #{artist}"
+      s << " (on: #{album})" if album
+      s << " (Remarks: #{remarks})" if remarks
+      s << " #{short_url}" if short_url
+    else
+      s = "#{progress}, please wait (#{url})"
+    end
+
     s
   end
 
@@ -67,6 +92,7 @@ class Song
         :remarks    => remarks,
         :url        => url,
         :short_url  => short_url,
+        :complete   => complete
     }
   end
 

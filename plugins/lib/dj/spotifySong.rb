@@ -5,15 +5,17 @@ require 'pp'
 class SpotifySong < Song
   include Logging
 
-  attr_reader :id
   attr_reader :playlist_origin
 
+  # Example URL
+  # https://play.spotify.com/track/68y4C6DGkdX0C9DjRbKB2g
   def initialize(
     properties = {}
   )
     super
-    @id               = properties['id'] || nil
-    @playlist_origin  = properties['playlist_origin'] || nil
+    unless properties['spotify'].nil?
+      @playlist_origin  = properties['spotify']['playlist_origin'] || nil
+    end
 
   end
 
@@ -30,18 +32,21 @@ class SpotifySong < Song
     RSpotify.authenticate(@auth[:key], @auth[:secret]) if @do_auth
   end
 
+  def itemid
+    URI(self.url).path.split('/')[-1]
+  end
+
   # allow process to handle a url or a track object
   # track objects would come from spotifyPlaylist
   def process(o)
 
     unless o.is_a?(RSpotify::Track)
       # Handle a URL
-      url = o
-      # https://play.spotify.com/track/68y4C6DGkdX0C9DjRbKB2g
-      itemid = URI(url).path.split('/')[-1]
+
+      self.url = o
 
       begin
-        track = RSpotify::Track.find(itemid)
+        track = RSpotify::Track.find(self.itemid)
       rescue Exception => e
         # TODO: log this error somewhere
         raise("Spotify request failed: #{e.message}.")
@@ -55,20 +60,17 @@ class SpotifySong < Song
       track = o
     end
 
-    @id = track.id
     self.artist = track.artists[0].name
     self.title = track.name
     self.album = track.album.name
 
-    return true
   end
 
 
   def to_h
     super.merge(
         {
-          id => @id,
-          playlist_origin => @playlist_origin
+            spotify: {playlist_origin: self.playlist_origin}
         })
   end
 

@@ -2,10 +2,8 @@ require 'rspotify'
 require_relative '../logging'
 require 'pp'
 
-class SpotifyPlaylist
+class SpotifyPlaylist < Song
   include Logging
-
-  attr_reader :id
 
   def auth(key, secret)
     @auth = {
@@ -16,16 +14,23 @@ class SpotifyPlaylist
     RSpotify.authenticate(@auth[:key], @auth[:secret])
   end
 
+  def itemid
+    URI(self.url).path.split('/')[-1]
+  end
+
+  def user
+    URI(self.url).path.split('/')[-3]
+  end
+
   # http://open.spotify.com/user/conservativela/playlist/7fl70xvClWq2K1rYyK8wyI
   # Return an array of Spotify tracks
   def process(url)
+    self.url = url
 
     songs = []
-    itemid = URI(url).path.split('/')[-1]
-    user = URI(url).path.split('/')[-3]
 
     begin
-      playlist = RSpotify::Playlist.find(user, itemid)
+      playlist = RSpotify::Playlist.find(self.user, self.itemid)
     rescue Exception => e
       # TODO: log this error somewhere
       raise("Spotify request failed: #{e.message}.")
@@ -47,7 +52,6 @@ class SpotifyPlaylist
   def to_h
     super.merge(
         {
-          id => @id
         })
   end
 

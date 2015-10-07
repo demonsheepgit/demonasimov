@@ -83,7 +83,7 @@ EOF
     begin
       case URI(url).host
         when /amazon.com$/
-          song = AmazonSong.new
+          song = AmazonSong.new({'url' => url, 'is_new' => true})
           song.auth(config[:aws_access_key_id], config[:aws_secret_access_key])
           # wrap song.process in a thread?
           # that should allow us to watch/notify the user when we're done
@@ -96,17 +96,30 @@ EOF
           #
           # We need to handle a timeout from a request, and handle a user canceling/dropping the
           # request before it finished processing.
+          song_id = _add_request(msg, song)
           song.process(url)
+          # TODO: post-process
+          # a post-process action needs to happen here that looks at the song's
+          # progress attribute to determine if the song should be kept (:complete)
+          # or removed (:failed, :canceled) and to notify the user of the result
+          # TODO: figure out some way to handle incomplete requests
+          # when we're starting back up - because we've already committed the request
+          # to disk
+
+          @requests.update(msg.user.nick, song_id, song)
+
         when /spotify.com$/
           query_type = URI(url).path.split('/')[-2]
 
           case query_type
             when 'track'
-              song = SpotifySong.new
+              song = SpotifySong.new({'url' => url, 'is_new' => true})
+              song_id = _add_request(msg, song)
               song.auth(config[:spotify_client_id], config[:spotify_client_secret])
               song.process(url)
+              @requests.update(msg.user.nick, song_id, song)
             when 'playlist'
-              playlist = SpotifyPlaylist.new
+              playlist = SpotifyPlaylist.new({'url' => url, 'is_new' => true})
               playlist.auth(config[:spotify_client_id], config[:spotify_client_secret])
               songs = playlist.process(url)
           end
@@ -133,7 +146,7 @@ EOF
       return
     end
 
-    _add_request(msg, song) unless song.nil?
+    # _add_request(msg, song) unless song.nil?
     _add_requests(msg, songs) unless songs.nil?
 
   end
@@ -177,6 +190,8 @@ EOF
     end
 
     _address_reply(msg, "Added request: ##{song_id}: #{song.to_s}")
+
+    return song_id
   end
 
   # Add multiple songs at once, ie from a playlist
