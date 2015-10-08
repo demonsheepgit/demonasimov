@@ -36,61 +36,52 @@ class Requests
   # @return [int] the int id of the song added
   #   nil otherwise
   def add(nick, song)
-    @requests[nick] = {} unless @requests.key?(nick)
-    song_id = @requests[nick].length + 1
-    @requests[nick][song_id] = song
+    @requests[nick] = [] unless @requests.key?(nick)
+    @requests[nick] << song
 
     save_requests
 
-    song_id
+    @requests[nick].length
   end
 
   # @param nick [String] user nick
-  # @param id [int] the song to be removed
+  # @param index [int] the song to be removed
   #
   # @return void
-  def remove(nick, id)
+  def remove(nick, index)
     return if @requests[nick].nil?
-    return if @requests[nick][id.to_i].nil?
+    return if @requests[nick][index.to_i].nil?
 
-    @requests[nick].delete(id.to_i)
-
-    # re-sequence the request_id keys
-    idx = 1
-
-    @requests[nick].keys.each do |id|
-      @requests[nick][idx] = @requests[nick].delete(id)
-      idx += 1
-    end
+    @requests[nick].delete(index.to_i)
 
     save_requests
   end
 
   # Fetch the requested song
   # @param nick [String] user nick
-  # @param id [int] the request to be modified
+  # @param index [int] the request to be modified
   #
   # @return [Song]
-  def get(nick, id)
+  def get(nick, index)
     return nil if @requests[nick].nil?
-    return nil if @requests[nick][id.to_i].nil?
+    return nil if @requests[nick][index.to_i].nil?
 
-    @requests[nick][id.to_i]
+    @requests[nick][index.to_i]
   end
 
   # Replace/update the song identified by id
   # This allows updating the remarks, adding an
   # album title, etc
   # @param nick [String] user nick
-  # @param id [int] the request to be modified
+  # @param index [int] the request to be modified
   # @param song [Song] the updated song
   #
   # @return void
-  def update(nick, id, song)
+  def update(nick, index, song)
     return if @requests[nick].nil?
-    return if @requests[nick][id.to_i].nil?
+    return if @requests[nick][index.to_i].nil?
 
-    @requests[nick][id.to_i] = song
+    @requests[nick][index.to_i] = song
   end
 
   # @param nick [String] user's nick or nil for all users
@@ -118,7 +109,7 @@ class Requests
   #
   # @return [Hash] of the user's requests
   def list(nick)
-    return {} if @requests[nick].nil?
+    return [] if @requests[nick].nil?
     @requests[nick]
   end
 
@@ -137,17 +128,7 @@ class Requests
     if request_json.nil?
       {}
     else
-
-      request_data = JSON.parse(request_json, :create_additions => true)
-
-      # convert the string representations of the request sequence id to an integer
-      request_data.keys.each do |nick|
-        request_data[nick].keys.each do |id_string|
-          request_data[nick][id_string.to_i] = request_data[nick].delete(id_string)
-        end
-      end
-
-      request_data
+      JSON.parse(request_json, :create_additions => true)
     end
   end
 
@@ -158,11 +139,11 @@ class Requests
     interval = SATURDAY - Date.today().wday
     interval = SATURDAY if (interval < 0)
 
-    return Date.today() + interval
+    Date.today + interval
   end
 
   def past_deadline?
-    Date.today() >= @show_date && Time.now.hour >= DEADLINE_HOUR
+    Date.today >= @show_date && Time.now.hour >= DEADLINE_HOUR
   end
 
   # If necessary, roll @show_date to the next week
@@ -177,7 +158,7 @@ class Requests
       @roller_status = Thread.current.status
       while true do
         sleep 600
-        if Date.today() > @show_date
+        if Date.today > @show_date
           @lock.synchronize do
             save_requests
             @requests = {}

@@ -313,8 +313,8 @@ EOF
 
     return if request_list.count == 0
 
-    request_list.each do |id, song|
-      _address_reply(msg, "##{id}) #{song.to_s}")
+    request_list.each_with_index do |song, idx|
+      _address_reply(msg, "##{idx+1}) #{song.to_s}")
     end
   end
 
