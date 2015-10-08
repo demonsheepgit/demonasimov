@@ -24,8 +24,7 @@ class SpotifyPlaylist < Song
 
   # http://open.spotify.com/user/conservativela/playlist/7fl70xvClWq2K1rYyK8wyI
   # Return an array of Spotify tracks
-  def process(url)
-    self.url = url
+  def process
 
     songs = []
 

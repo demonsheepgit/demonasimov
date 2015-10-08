@@ -20,7 +20,7 @@ class SpotifySong < Song
   end
 
   def playlist_origin=(value)
-    @playlist_origin = value.nil? ? nil : value.slice(0..MAX_STR_LENGTH)
+    @playlist_origin = value.nil? ? nil : value.slice(0..MAX_URL_LENGTH)
   end
 
   def auth(key, secret)
@@ -29,7 +29,7 @@ class SpotifySong < Song
         :secret => secret
     }
 
-    RSpotify.authenticate(@auth[:key], @auth[:secret]) if @do_auth
+    RSpotify.authenticate(@auth[:key], @auth[:secret])
   end
 
   def itemid
@@ -38,13 +38,10 @@ class SpotifySong < Song
 
   # allow process to handle a url or a track object
   # track objects would come from spotifyPlaylist
-  def process(o)
+  def process(o=nil)
 
     unless o.is_a?(RSpotify::Track)
       # Handle a URL
-
-      self.url = o
-
       begin
         track = RSpotify::Track.find(self.itemid)
       rescue Exception => e

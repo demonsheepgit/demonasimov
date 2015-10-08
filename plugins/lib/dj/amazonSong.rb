@@ -13,6 +13,8 @@ class AmazonSong < Song
   )
     super
 
+    @simulate = properties['simulate'] === true
+
   end
 
   def auth(key, secret)
@@ -22,13 +24,11 @@ class AmazonSong < Song
     }
   end
 
-  def process(url)
-
-    self.url = url
+  def process
     self.progress = :processing
 
     # fake a delay to test threads
-    sleep 10
+    # sleep 10
     amazon = Vacuum::Request.new
 
     amazon.configure(
@@ -40,15 +40,24 @@ class AmazonSong < Song
     resp_hash = Hash.new
 
     begin
-      response = amazon.item_lookup(
-          query: {
-              :ItemId => self.itemid,
-              :ResponseGroup => %w(RelatedItems Small).join(','),
-              :RelationshipType => 'Tracks'
-          }
-      )
+      resp_hash = {}
+      if @simulate
+        json = File.read('amazon_song_B007T2XCIY.json')
+        resp_hash = JSON.parse(json)
+      else
+        response = amazon.item_lookup(
+            query: {
+                :ItemId => self.itemid,
+                :ResponseGroup => %w(RelatedItems Small).join(','),
+                :RelationshipType => 'Tracks'
+            }
+        )
 
-      resp_hash = response.to_h
+        resp_hash = response.to_h
+      end
+
+
+
       if resp_hash['ItemLookupResponse']['Items']['Request']['Errors']
         self.progress = :failed
         raise resp_hash['ItemLookupResponse']['Items']['Request']['Errors']['Error']['Message']
@@ -67,7 +76,11 @@ class AmazonSong < Song
     self.album  = item['RelatedItems']['RelatedItem']['Item']['ItemAttributes']['Title']
     self.url    = item['DetailPageURL']
 
-    self.progress = :complete unless self.progress == :canceled
+    unless self.progress == :canceled
+      self.progress = :complete
+      self.complete = true
+    end
+
 
   end
 

@@ -97,7 +97,7 @@ EOF
           # We need to handle a timeout from a request, and handle a user canceling/dropping the
           # request before it finished processing.
           song_id = _add_request(msg, song)
-          song.process(url)
+          song.process
           # TODO: post-process
           # a post-process action needs to happen here that looks at the song's
           # progress attribute to determine if the song should be kept (:complete)
@@ -116,12 +116,12 @@ EOF
               song = SpotifySong.new({'url' => url, 'is_new' => true})
               song_id = _add_request(msg, song)
               song.auth(config[:spotify_client_id], config[:spotify_client_secret])
-              song.process(url)
+              song.process
               @requests.update(msg.user.nick, song_id, song)
             when 'playlist'
               playlist = SpotifyPlaylist.new({'url' => url, 'is_new' => true})
               playlist.auth(config[:spotify_client_id], config[:spotify_client_secret])
-              songs = playlist.process(url)
+              songs = playlist.process
           end
         when /youtube.com$/
           # youtube = YoutubeSong.new(config, url)
@@ -292,9 +292,7 @@ EOF
     target = subject.empty? ? msg.user.nick : subject
 
     synchronize(:request_sync) do
-      while @requests.count(target) > 0 do
-        @requests.remove(target, 1)
-      end
+      @requests.remove_all(msg.user.nick)
     end
 
     (target == msg.user.nick) ?

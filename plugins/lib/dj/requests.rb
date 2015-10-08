@@ -57,6 +57,12 @@ class Requests
     save_requests
   end
 
+  def remove_all(nick)
+    @requests[nick] = []
+
+    save_requests
+  end
+
   # Fetch the requested song
   # @param nick [String] user nick
   # @param index [int] the request to be modified
