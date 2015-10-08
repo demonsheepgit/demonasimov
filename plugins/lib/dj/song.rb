@@ -16,6 +16,7 @@ class Song
   attr_reader :remarks
   attr_reader :url
   attr_reader :short_url
+  attr_reader :created
   attr_reader :progress
   attr_reader :complete
 
@@ -32,11 +33,7 @@ class Song
     @short_url  = properties['short_url'] || nil
     @complete   = properties['complete']
     @url        = properties['url'] || nil
-
-    pp properties
-    pp self
-
-
+    @created    = properties['created'] || Time.now.to_f
   end
 
 
@@ -71,7 +68,7 @@ class Song
   end
 
   def to_s
-    pp self
+    # pp self
     if progress.nil? || progress.to_sym == :complete
       s = "#{title} by: #{artist}"
       s << " (on: #{album})" if album
@@ -92,6 +89,7 @@ class Song
         :remarks    => remarks,
         :url        => url,
         :short_url  => short_url,
+        :created    => created,
         :complete   => complete
     }
   end
