@@ -12,6 +12,8 @@ require 'pp'
 require 'tweetstream'
 require 'uri'
 
+HEWITT_ID = 15075999
+
 class Cinch::Plugins::HHTwitter
   include Cinch::Plugin
 
@@ -71,17 +73,20 @@ class Cinch::Plugins::HHTwitter
     client = TweetStream::Client.new
 
     client.on_error do |message|
-      msg.reply "Got an error, stopping tweet stream (#{message.lines.first})"
+      puts message
+      msg.reply "Got an error, stopping tweet stream (#{message.lines.first.strip})"
       @hh_twitter = false
       client.stop
     end
 
-    client.follow(15075999) do |status, client|
+    client.follow(HEWITT_ID) do |status, client|
 
       client.stop unless @hh_twitter
 
       # skip this tweet if it doesn't meet the criteria
       next unless repeatable?(status)
+
+      text = nil
 
       if is_retweet?(status)
         text = original_text_of_rt(status)
@@ -93,6 +98,7 @@ class Cinch::Plugins::HHTwitter
       # so we'll wrap up the url in a dfm shortened url.
       text = wrap_urls(text)
 
+      puts "#{status.attrs[:id]}: #{status.attrs[:created_at]} #{text}"
       msg.reply "@HughHewitt: #{text}"
       @last_tweet = Time.new.to_i
 
@@ -106,17 +112,23 @@ class Cinch::Plugins::HHTwitter
   end
 
   def original_text_of_rt(status)
-    return "RT @#{status.attrs['retweeted_status']['user']['screenname']}: #{status.attrs['retweeted_status']['text']}"
+    author = status.attrs[:retweeted_status][:user][:screen_name]
+    result = "RT @#{author}: #{status.attrs[:retweeted_status][:text]}"
+    result
+
   end
 
   def is_retweet?(status)
-    status.attrs.has_key?('retweeted_status')
+    status.attrs.has_key?(:retweeted_status)
   end
 
   def wrap_urls(text)
     new_text = text.clone
     URI.extract(text) do |url|
-      new_text = new_text.sub(url,shorten_url(url))
+      if url =~ /\A#{URI::regexp(%w(http https))}\z/
+        new_text = new_text.sub(url,shorten_url(url))
+      end
+
     end
 
     return new_text
@@ -138,12 +150,10 @@ class Cinch::Plugins::HHTwitter
 
     repeatable = true
 
-    repeatable = false unless status.attrs[:user][:id] == 15075999
+    repeatable = false unless [HEWITT_ID].include?(status.attrs[:user][:id])
     repeatable = false unless status.in_reply_to_status_id.nil?
     repeatable = false unless status.text.lines.count <= @line_limit
     repeatable = false unless Time.new.to_i > (@last_tweet + @time_limit)
-
-    pp status.attrs if repeatable
 
     repeatable
   end
