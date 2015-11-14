@@ -106,7 +106,7 @@ class Cinch::Plugins::HHTwitter
   end
 
   def original_text_of_rt(status)
-    return status.attrs['retweeted_status']['text']
+    return "RT @#{status.attrs['retweeted_status']['user']['screenname']}: #{status.attrs['retweeted_status']['text']}"
   end
 
   def is_retweet?(status)
