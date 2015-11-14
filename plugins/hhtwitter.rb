@@ -35,6 +35,8 @@ class Cinch::Plugins::HHTwitter
     @line_limit = 3 # lines
     @time_limit = 8 # seconds
 
+    @client = TweetStream::Client.new
+
   end
 
 
@@ -70,18 +72,16 @@ class Cinch::Plugins::HHTwitter
 
     msg.reply('ok')
 
-    client = TweetStream::Client.new
-
-    client.on_error do |message|
+    @client.on_error do |message|
       puts message
       msg.reply "Got an error, stopping tweet stream (#{message.lines.first.strip})"
       @hh_twitter = false
-      client.stop
+      @client.stop
     end
 
-    client.follow(HEWITT_ID) do |status, client|
+    @client.follow(HEWITT_ID) do |status|
 
-      client.stop unless @hh_twitter
+      @client.stop unless @hh_twitter
 
       # skip this tweet if it doesn't meet the criteria
       next unless repeatable?(status)
@@ -98,7 +98,6 @@ class Cinch::Plugins::HHTwitter
       # so we'll wrap up the url in a dfm shortened url.
       text = wrap_urls(text)
 
-      puts "#{status.attrs[:id]}: #{status.attrs[:created_at]} #{text}"
       msg.reply "@HughHewitt: #{text}"
       @last_tweet = Time.new.to_i
 
@@ -107,6 +106,7 @@ class Cinch::Plugins::HHTwitter
 
   def toggle_hugh_tweets_off(msg)
     @hh_twitter = false
+    @client.stop
     msg.reply('ok - no more HughTweets')
     return
   end
