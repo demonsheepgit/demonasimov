@@ -35,8 +35,6 @@ class Cinch::Plugins::HHTwitter
     @line_limit = 3 # lines
     @time_limit = 8 # seconds
 
-    @client = TweetStream::Client.new
-
   end
 
 
@@ -50,6 +48,8 @@ class Cinch::Plugins::HHTwitter
       c.oauth_token_secret = config[:twitter_access_token_secret]
       c.auth_method = :oauth
     end
+
+    @client = TweetStream::Client.new
 
   end
 
@@ -77,6 +77,10 @@ class Cinch::Plugins::HHTwitter
       msg.reply "Got an error, stopping tweet stream (#{message.lines.first.strip})"
       @hh_twitter = false
       @client.stop
+    end
+
+    @client.on_limit do |discarded_count|
+      puts "Twitter rate limit. #{discarded_count} discarded"
     end
 
     @client.follow(HEWITT_ID) do |status|
