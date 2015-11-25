@@ -39,7 +39,8 @@ class Cinch::Plugins::RollCall
       end
 
       if @users.has_key?(nick)
-        if @users[nick] + @idle_time > Time.now
+        if Time.now > @users[nick] + @idle_time
+          pp "lurker: #{nick}"
           user_counts[:lurkers] += 1
         end
       end
