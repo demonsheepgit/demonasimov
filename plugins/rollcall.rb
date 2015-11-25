@@ -27,7 +27,6 @@ class Cinch::Plugins::RollCall
     }
 
     msg.channel.users.each do |user|
-      pp user[0]
       nick = user[0].nick
       modes = user[1]
 
