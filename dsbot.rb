@@ -9,6 +9,7 @@ require 'cinch/plugins/fortune'
 require 'cinch/plugins/identify'
 require_relative 'plugins/dj'
 require_relative 'plugins/nowplaying'
+require_relative 'plugins/rollcall'
 require_relative 'plugins/ustream'
 
 Cinch::Plugins::Fortune.configure do |config|
@@ -63,6 +64,7 @@ bot = Cinch::Bot.new do
         Cinch::Plugins::Fortune,
         Cinch::Plugins::Identify,
         Cinch::Plugins::NowPlaying,
+        Cinch::Plugins::RollCall,
         Cinch::Plugins::UStream
     ]
   end
