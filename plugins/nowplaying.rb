@@ -187,8 +187,8 @@ EOF
   def is_hh_show_time?
     # Monday through Friday
     if (1..5).to_a.include?(DateTime.now().wday)
-      # 17:00-19:59 (Central Time)
-      if (17..19).to_a.include?(DateTime.now().hour)
+      # 05:00-08:59 (Central Time)
+      if (5..8).to_a.include?(DateTime.now().hour)
         return true
       end
     end

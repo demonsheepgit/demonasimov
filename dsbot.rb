@@ -20,6 +20,7 @@ config = YAML.load_file('dsbot.yml')
 
 bot = Cinch::Bot.new do
   configure do |param|
+    param.reconnect = true
     param.server = config['irc']['server']
     param.messages_per_second = config['irc']['messages_per_second']
     param.server_queue_size = config['irc']['server_queue_size']
